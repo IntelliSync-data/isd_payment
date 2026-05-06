@@ -1,0 +1,50 @@
+/* ISD Payment Module CSS */
+
+.api-documentation {
+    max-width: 100%;
+    padding: 20px;
+}
+
+.api-documentation code {
+    background: #f4f4f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 90%;
+}
+
+.api-documentation pre code {
+    background: transparent;
+    padding: 0;
+}
+
+.api-documentation ul {
+    list-style-type: disc;
+    margin-left: 20px;
+}
+
+.api-documentation li {
+    margin: 5px 0;
+}
+
+/* Payment Method Form Enhancements */
+.o_isd_payment_method_form .oe_button_box {
+    margin-bottom: 20px;
+}
+
+/* Transaction Status Colors */
+.badge.text-bg-success {
+    background-color: #28a745 !important;
+}
+
+.badge.text-bg-info {
+    background-color: #17a2b8 !important;
+}
+
+.badge.text-bg-danger {
+    background-color: #dc3545 !important;
+}
+
+.badge.text-bg-secondary {
+    background-color: #6c757d !important;
+}

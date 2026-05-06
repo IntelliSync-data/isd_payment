@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- API Documentation Wizard Form -->
+    <record id="view_api_documentation_wizard_form" model="ir.ui.view">
+        <field name="name">isd_payment.api_documentation_wizard.form</field>
+        <field name="model">isd_payment.api_documentation_wizard</field>
+        <field name="arch" type="xml">
+            <form string="API Documentation">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="payment_method_id" readonly="1" options="{'no_open': True}"/>
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group>
+                            <field name="provider_name" readonly="1"/>
+                            <field name="api_base_url" readonly="1" widget="url"/>
+                        </group>
+                        <group>
+                            <field name="cors_enabled" readonly="1" widget="boolean"/>
+                        </group>
+                    </group>
+
+                    <group string="CORS Settings" invisible="not cors_enabled">
+                        <field name="allowed_origins_display" nolabel="1" readonly="1"/>
+                    </group>
+
+                    <separator string="API Endpoints"/>
+
+                    <field name="api_documentation" nolabel="1" readonly="1"/>
+
+                </sheet>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

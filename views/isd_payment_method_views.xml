@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Payment Method Form View -->
+    <record id="view_isd_payment_method_form" model="ir.ui.view">
+        <field name="name">isd_payment.method.form</field>
+        <field name="model">isd_payment.method</field>
+        <field name="arch" type="xml">
+            <form string="Payment Method">
+                <header>
+                    <button name="action_view_api_documentation"
+                            string="View APIs"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="not is_configured"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_transactions"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-list-alt">
+                            <field name="transaction_count" widget="statinfo" string="Transactions"/>
+                        </button>
+                        <button name="action_view_transactions"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-clock-o"
+                                context="{'search_default_status_pending': 1}">
+                            <field name="pending_transaction_count" widget="statinfo" string="Pending"/>
+                        </button>
+                        <button name="action_view_transactions"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-check-circle"
+                                context="{'search_default_status_confirmed': 1}">
+                            <field name="confirmed_transaction_count" widget="statinfo" string="Confirmed"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="is_configured" invisible="1"/>
+
+                    <group>
+                        <group>
+                            <field name="name" placeholder="e.g., Desktop App Payment"/>
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="payment_provider" widget="radio"/>
+                            <field name="prefix" placeholder="e.g., DESK_"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="api_base_url" readonly="1" widget="url"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Provider Configuration" name="provider_config">
+                            <group>
+                                <group string="API Settings">
+                                    <field name="sepay_host" placeholder="https://my.sepay.vn"/>
+                                    <field name="sepay_qr_host" placeholder="https://qr.sepay.vn"/>
+                                    <field name="sepay_api_token" password="True" placeholder="Your API Token"/>
+                                </group>
+                                <group string="Bank Account">
+                                    <field name="sepay_acc_number" placeholder="0123456789"/>
+                                    <field name="sepay_acc_bank" placeholder="VCB"/>
+                                    <field name="sepay_prefix_transaction_id" placeholder="PREFIX_"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="CORS Configuration" name="cors_config">
+                            <group>
+                                <group>
+                                    <field name="enable_cors" widget="boolean_toggle"/>
+                                    <div class="text-muted" colspan="2">
+                                        <small>
+                                            <ul>
+                                                <li><b>Disabled:</b> API is public, anyone can use it</li>
+                                                <li><b>Enabled + Empty:</b> Only current domain is allowed</li>
+                                                <li><b>Enabled + URLs:</b> Specified URLs + current domain are allowed</li>
+                                            </ul>
+                                        </small>
+                                    </div>
+                                </group>
+                            </group>
+                            <group invisible="not enable_cors">
+                                <field name="allowed_origins"
+                                       placeholder="https://example.com&#10;https://app.example.com&#10;http://localhost:3000"
+                                       nolabel="1"/>
+                                <div class="text-muted">
+                                    <small>Enter one URL per line. Leave empty to allow only current domain.</small>
+                                </div>
+                            </group>
+                        </page>
+
+                        <page string="API Information" name="api_info" invisible="not is_configured">
+                            <div class="alert alert-info" role="alert">
+                                <h4>Quick Start</h4>
+                                <p>Your payment method is configured! Click <b>"View APIs"</b> button above to see:</p>
+                                <ul>
+                                    <li>Available API endpoints</li>
+                                    <li>Request/Response samples</li>
+                                    <li>Code examples (cURL, Python, JavaScript)</li>
+                                    <li>Integration guide</li>
+                                </ul>
+                            </div>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Payment Method Tree View -->
+    <record id="view_isd_payment_method_tree" model="ir.ui.view">
+        <field name="name">isd_payment.method.tree</field>
+        <field name="model">isd_payment.method</field>
+        <field name="arch" type="xml">
+            <list string="Payment Methods">
+                <field name="name"/>
+                <field name="payment_provider"/>
+                <field name="prefix"/>
+                <field name="transaction_count"/>
+                <field name="pending_transaction_count"/>
+                <field name="confirmed_transaction_count"/>
+                <field name="is_configured" widget="boolean_toggle"/>
+                <field name="active" widget="boolean_toggle"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Payment Method Search View -->
+    <record id="view_isd_payment_method_search" model="ir.ui.view">
+        <field name="name">isd_payment.method.search</field>
+        <field name="model">isd_payment.method</field>
+        <field name="arch" type="xml">
+            <search string="Payment Methods">
+                <field name="name" filter_domain="[('name','ilike',self)]"/>
+                <field name="payment_provider"/>
+                <field name="prefix"/>
+                <separator/>
+                <filter string="Active" name="active" domain="[('active','=',True)]"/>
+                <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
+                <separator/>
+                <filter string="Configured" name="configured" domain="[('is_configured','=',True)]"/>
+                <filter string="Not Configured" name="not_configured" domain="[('is_configured','=',False)]"/>
+                <separator/>
+                <filter string="SePay" name="sepay" domain="[('payment_provider','=','sepay')]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Provider" name="group_provider" context="{'group_by':'payment_provider'}"/>
+                    <filter string="Company" name="group_company" context="{'group_by':'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Payment Method Action -->
+    <record id="action_isd_payment_method" model="ir.actions.act_window">
+        <field name="name">Payment Methods</field>
+        <field name="res_model">isd_payment.method</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Payment Method
+            </p>
+            <p>
+                Configure payment gateways to generate REST APIs for your applications.
+            </p>
+        </field>
+    </record>
+
+</odoo>

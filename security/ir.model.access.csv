@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_isd_payment_method_user,isd_payment.method.user,model_isd_payment_method,base.group_user,1,1,1,1
+access_isd_payment_transaction_user,isd_payment.transaction.user,model_isd_payment_transaction,base.group_user,1,1,1,0
+access_isd_payment_api_doc_wizard_user,isd_payment.api_documentation_wizard.user,model_isd_payment_api_documentation_wizard,base.group_user,1,1,1,1
+access_isd_payment_method_public,isd_payment.method.public,model_isd_payment_method,base.group_public,1,0,0,0
+access_isd_payment_transaction_public,isd_payment.transaction.public,model_isd_payment_transaction,base.group_public,1,0,0,0

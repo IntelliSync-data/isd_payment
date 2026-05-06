@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Main Menu -->
+    <menuitem id="menu_isd_payment_root"
+              name="ISD Payment"
+              sequence="10"
+              web_icon="isd_payment,static/description/icon.png"/>
+
+    <!-- Payment Methods Menu -->
+    <menuitem id="menu_isd_payment_methods"
+              name="Payment Methods"
+              parent="menu_isd_payment_root"
+              action="action_isd_payment_method"
+              sequence="10"/>
+
+    <!-- Transactions Menu -->
+    <menuitem id="menu_isd_payment_transactions"
+              name="Transactions"
+              parent="menu_isd_payment_root"
+              action="action_isd_payment_transaction"
+              sequence="20"/>
+
+    <!-- Configuration Menu -->
+    <menuitem id="menu_isd_payment_config"
+              name="Configuration"
+              parent="menu_isd_payment_root"
+              sequence="100"
+              groups="base.group_system"/>
+
+</odoo>
