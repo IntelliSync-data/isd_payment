@@ -31,7 +31,8 @@ jobs:
           fi
           
           # Sync isd_payment directory with rsync (including deletions)
-          sudo rsync -av --delete ~/addons-system/isd_payment/ /opt/custom-addons/
+          sudo mkdir -p /opt/custom-addons/isd_payment
+          sudo rsync -av --delete ~/addons-system/isd_payment/ /opt/custom-addons/isd_payment/
 
     - name: Update isd_payment Module
       uses: appleboy/ssh-action@master
