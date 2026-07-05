@@ -21,9 +21,14 @@ jobs:
         key: ${{ secrets.VFO_SSH_KEY }}
         script_stop: true
         script: |
-          # Force update to latest remote code (no conflicts)
-          cd ~/addons-system/isd_payment
-          git fetch origin && git reset --hard origin/vfo
+          # Clone if not exists, otherwise update
+          if [ ! -d ~/addons-system/isd_payment ]; then
+            git clone git@github.com:IntelliSync-data/isd_payment.git ~/addons-system/isd_payment
+            cd ~/addons-system/isd_payment && git checkout vfo
+          else
+            cd ~/addons-system/isd_payment
+            git fetch origin && git reset --hard origin/vfo
+          fi
           
           # Sync isd_payment directory with rsync (including deletions)
           sudo rsync -av --delete ~/addons-system/isd_payment/ /opt/custom-addons/
