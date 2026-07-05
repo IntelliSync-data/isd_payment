@@ -1,0 +1,32 @@
+name: Update Bloompod
+
+on:
+  push:
+    branches:
+      - bloompod
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Update Bloompod
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.BLOOMPOD_HOST }}
+        username: ${{ secrets.BLOOMPOD_USERNAME }}
+        key: ${{ secrets.BLOOMPOD_SSH_KEY }}
+        script_stop: true
+        script: |
+          # Force update to latest remote code (no conflicts)
+          cd ~/addons-system/openeducat
+          git fetch origin && git reset --hard origin/bloompod
+          
+          # Sync openeducat directory with rsync (including deletions)
+          rsync -av --delete ~/addons-system/openeducat/ ~/bloompod/
+          
+          # Restart Odoo service to apply changes
+          sudo systemctl restart odoo

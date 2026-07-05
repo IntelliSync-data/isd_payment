@@ -1,0 +1,32 @@
+name: Update Ehub Demo
+
+on:
+  push:
+    branches:
+      - ehub-demo
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Update Ehub Demo
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EHUB_DEMO_HOST }}
+        username: ${{ secrets.EHUB_DEMO_USERNAME }}
+        key: ${{ secrets.EHUB_DEMO_SSH_KEY }}
+        script_stop: true
+        script: |
+          # Force update to latest remote code (no conflicts)
+          cd ~/addons-system/openeducat
+          git fetch origin && git reset --hard origin/ehub-demo
+          
+          # Sync openeducat directory with rsync (including deletions)
+          rsync -av --delete ~/addons-system/openeducat/ ~/ehub-demo/
+          
+          # Restart Odoo service to apply changes
+          sudo systemctl restart odoo

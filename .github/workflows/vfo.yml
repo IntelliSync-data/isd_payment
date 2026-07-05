@@ -1,0 +1,32 @@
+name: Update ISD Payment Fishing VietNam
+
+on:
+  push:
+    branches:
+      - vfo
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Update Fishing VietNam
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.VFO_HOST }}
+        username: ${{ secrets.VFO_USERNAME }}
+        key: ${{ secrets.VFO_SSH_KEY }}
+        script_stop: true
+        script: |
+          # Force update to latest remote code (no conflicts)
+          cd ~/addons-system/isd_payment
+          git fetch origin && git reset --hard origin/vfo
+          
+          # Sync isd_payment directory with rsync (including deletions)
+          sudo rsync -av --delete ~/addons-system/isd_payment/ /opt/custom-addons/
+          
+          # Restart Odoo service to apply changes
+          sudo systemctl restart odoo
