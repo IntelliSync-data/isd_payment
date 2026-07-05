@@ -35,3 +35,19 @@ jobs:
           
           # Restart Odoo service to apply changes
           sudo systemctl restart odoo
+
+    - name: Verify Odoo Service
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.VFO_HOST }}
+        username: ${{ secrets.VFO_USERNAME }}
+        key: ${{ secrets.VFO_SSH_KEY }}
+        script: |
+          sleep 5
+          if sudo systemctl is-active --quiet odoo; then
+            echo "Odoo restarted successfully"
+          else
+            echo "Odoo failed to restart"
+            sudo systemctl status odoo --no-pager
+            exit 1
+          fi
