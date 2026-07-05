@@ -41,9 +41,11 @@ jobs:
         username: ${{ secrets.VFO_USERNAME }}
         key: ${{ secrets.VFO_SSH_KEY }}
         script: |
+          echo "Updating apps list..."
+          sudo -u odoo /opt/odoo/odoo-bin -c /etc/odoo/odoo.conf -d ${{ secrets.VFO_DB_NAME }} --update-list --stop-after-init
           echo "Updating isd_payment module..."
           sudo -u odoo /opt/odoo/odoo-bin -c /etc/odoo/odoo.conf -d ${{ secrets.VFO_DB_NAME }} -u isd_payment --stop-after-init || \
-            echo "Update failed (module may not be installed), continuing..."
+            echo "Module not installed yet (now visible in Apps list), continuing..."
 
     - name: Restart Odoo Service
       uses: appleboy/ssh-action@master
