@@ -13,7 +13,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
       
-    - name: Update Fishing VietNam
+    - name: Deploy isd_payment to Server
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.VFO_HOST }}
@@ -32,8 +32,25 @@ jobs:
           
           # Sync isd_payment directory with rsync (including deletions)
           sudo rsync -av --delete ~/addons-system/isd_payment/ /opt/custom-addons/
-          
-          # Restart Odoo service to apply changes
+
+    - name: Update isd_payment Module
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.VFO_HOST }}
+        username: ${{ secrets.VFO_USERNAME }}
+        key: ${{ secrets.VFO_SSH_KEY }}
+        script: |
+          echo "Updating isd_payment module..."
+          sudo -u odoo /opt/odoo/odoo-bin -c /etc/odoo/odoo.conf -d ${{ secrets.VFO_DB_NAME }} -u isd_payment --stop-after-init || \
+            echo "Update failed (module may not be installed), continuing..."
+
+    - name: Restart Odoo Service
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.VFO_HOST }}
+        username: ${{ secrets.VFO_USERNAME }}
+        key: ${{ secrets.VFO_SSH_KEY }}
+        script: |
           sudo systemctl restart odoo
 
     - name: Verify Odoo Service
@@ -48,6 +65,9 @@ jobs:
             echo "Odoo restarted successfully"
           else
             echo "Odoo failed to restart"
+            echo "=== systemctl status ==="
             sudo systemctl status odoo --no-pager
+            echo "=== Last 50 lines of Odoo log ==="
+            sudo tail -n 50 /var/log/odoo/odoo.log
             exit 1
           fi
