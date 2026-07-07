@@ -31,50 +31,54 @@ class IsdPaymentMethod(models.Model):
 
     # Provider
     payment_provider = fields.Selection(
-        [('sepay', 'SePay')],
+        [('sepay', 'SePay'), ('paypal', 'PayPal')],
         string='Payment Provider',
         required=True,
         default='sepay',
         help='Payment gateway provider'
     )
 
-    # SePay Configuration
+    # Shared Configuration
     prefix = fields.Char(
         string='Prefix',
         required=True,
         help='Prefix for transaction identification'
     )
-    sepay_host = fields.Char(
-        string='SePay Host',
+    provider_host = fields.Char(
+        string='Provider Host',
         required=True,
-        default='https://my.sepay.vn',
-        help='SePay API host URL'
+        help='API host URL for the payment provider'
     )
+    provider_account_id = fields.Char(
+        string='Account ID',
+        help='SePay: bank account number | PayPal: Client ID'
+    )
+    provider_secret = fields.Char(
+        string='Secret / Token',
+        help='SePay: API token | PayPal: Client Secret'
+    )
+
+    # SePay-specific Configuration
     sepay_qr_host = fields.Char(
-        string='SePay QR Host',
-        required=True,
+        string='QR Host',
         default='https://qr.sepay.vn',
         help='SePay QR code generation host'
     )
-    sepay_acc_number = fields.Char(
-        string='Account Number',
-        required=True,
-        help='Bank account number'
-    )
     sepay_acc_bank = fields.Char(
         string='Bank Code',
-        required=True,
         help='Bank code (e.g., VCB, TCB, MB, ...)'
     )
-    sepay_api_token = fields.Char(
-        string='API Token',
-        required=True,
-        help='SePay API authentication token'
+    # PayPal-specific Configuration
+    paypal_mode = fields.Selection(
+        [('sandbox', 'Sandbox'), ('live', 'Live')],
+        string='Mode',
+        default='sandbox',
+        help='PayPal environment mode'
     )
-    sepay_prefix_transaction_id = fields.Char(
-        string='Transaction ID Prefix',
-        required=True,
-        help='Prefix for auto-generated transaction IDs'
+    paypal_usd_exchange_rate = fields.Float(
+        string='USD Exchange Rate (VND)',
+        default=26300.0,
+        help='VND to USD exchange rate for converting payment amounts'
     )
 
     # CORS Configuration
@@ -120,7 +124,6 @@ class IsdPaymentMethod(models.Model):
     )
 
     def _compute_api_base_url(self):
-        """Compute API base URL"""
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
         for record in self:
             if record.id:
@@ -128,21 +131,26 @@ class IsdPaymentMethod(models.Model):
             else:
                 record.api_base_url = False
 
-    @api.depends('sepay_host', 'sepay_qr_host', 'sepay_acc_number', 'sepay_acc_bank', 'sepay_api_token', 'sepay_prefix_transaction_id')
+    @api.depends('payment_provider', 'provider_host', 'provider_account_id', 'provider_secret',
+                 'sepay_qr_host', 'sepay_acc_bank', 'paypal_mode')
     def _compute_is_configured(self):
-        """Check if all required fields are configured"""
         for record in self:
-            record.is_configured = all([
-                record.sepay_host,
-                record.sepay_qr_host,
-                record.sepay_acc_number,
-                record.sepay_acc_bank,
-                record.sepay_api_token,
-                record.sepay_prefix_transaction_id,
-            ])
+            if record.payment_provider == 'paypal':
+                record.is_configured = all([
+                    record.provider_host,
+                    record.provider_account_id,
+                    record.provider_secret,
+                ])
+            else:
+                record.is_configured = all([
+                    record.provider_host,
+                    record.provider_account_id,
+                    record.provider_secret,
+                    record.sepay_qr_host,
+                    record.sepay_acc_bank,
+                ])
 
     def _compute_transaction_count(self):
-        """Compute transaction counts"""
         for record in self:
             transactions = self.env['isd_payment.transaction'].search([
                 ('payment_method_id', '=', record.id)
@@ -155,19 +163,17 @@ class IsdPaymentMethod(models.Model):
                 lambda t: t.status == 'confirmed'
             ))
 
-    @api.constrains('sepay_host', 'sepay_qr_host')
+    @api.constrains('provider_host', 'sepay_qr_host')
     def _check_urls(self):
-        """Validate URL formats"""
         url_pattern = re.compile(r'^https?://')
         for record in self:
-            if record.sepay_host and not url_pattern.match(record.sepay_host):
-                raise ValidationError(_('SePay Host must start with http:// or https://'))
+            if record.provider_host and not url_pattern.match(record.provider_host):
+                raise ValidationError(_('Provider Host must start with http:// or https://'))
             if record.sepay_qr_host and not url_pattern.match(record.sepay_qr_host):
-                raise ValidationError(_('SePay QR Host must start with http:// or https://'))
+                raise ValidationError(_('QR Host must start with http:// or https://'))
 
     @api.constrains('allowed_origins')
     def _check_allowed_origins(self):
-        """Validate allowed origins format"""
         url_pattern = re.compile(r'^https?://[^\s]+$')
         for record in self:
             if record.allowed_origins:
@@ -180,25 +186,27 @@ class IsdPaymentMethod(models.Model):
                         )
 
     def get_allowed_origins(self):
-        """Get list of allowed origins including current domain"""
         self.ensure_one()
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
         allowed_origins = [base_url]
-
         if self.allowed_origins:
             origins = self.allowed_origins.strip().split('\n')
             allowed_origins.extend([o.strip() for o in origins if o.strip()])
-
-        return list(set(allowed_origins))  # Remove duplicates
+        return list(set(allowed_origins))
 
     def generate_qr_url(self, transaction_id, amount):
-        """Generate QR code URL for payment"""
+        """Generate SePay QR code URL"""
         self.ensure_one()
         from urllib.parse import quote
-        return f"{self.sepay_qr_host}/img?acc={self.sepay_acc_number}&bank={self.sepay_acc_bank}&amount={int(amount)}&des={quote(transaction_id)}"
+        return (
+            f"{self.sepay_qr_host}/img"
+            f"?acc={self.provider_account_id}"
+            f"&bank={self.sepay_acc_bank}"
+            f"&amount={int(amount)}"
+            f"&des={quote(transaction_id)}"
+        )
 
     def action_view_api_documentation(self):
-        """Open API documentation wizard"""
         self.ensure_one()
         return {
             'name': _('API Documentation'),
@@ -206,13 +214,10 @@ class IsdPaymentMethod(models.Model):
             'res_model': 'isd_payment.api_documentation_wizard',
             'view_mode': 'form',
             'target': 'new',
-            'context': {
-                'default_payment_method_id': self.id,
-            },
+            'context': {'default_payment_method_id': self.id},
         }
 
     def action_view_transactions(self):
-        """View transactions for this payment method"""
         self.ensure_one()
         return {
             'name': _('Transactions'),
@@ -220,7 +225,5 @@ class IsdPaymentMethod(models.Model):
             'res_model': 'isd_payment.transaction',
             'view_mode': 'list,form',
             'domain': [('payment_method_id', '=', self.id)],
-            'context': {
-                'default_payment_method_id': self.id,
-            },
+            'context': {'default_payment_method_id': self.id},
         }

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        PayPal Payment Method - Default Record
+        =======================================
+        After installing/updating this module, go to:
+            ISD Payment > Payment Methods > PayPal Default
+        and fill in your actual PayPal credentials.
+
+        Field mapping from isd_profile_management config params:
+            provider_host            ← isd_profile_management.pm_paypal_host
+            provider_account_id      ← isd_profile_management.pm_paypal_client_id
+            provider_secret          ← isd_profile_management.pm_paypal_client_secret
+            paypal_mode              ← isd_profile_management.pm_paypal_mode
+            paypal_usd_exchange_rate ← isd_profile_management.pm_paypal_usd_exchange_rate
+    -->
+    <record id="paypal_default_payment_method" model="isd_payment.method">
+        <field name="name">PayPal</field>
+        <field name="payment_provider">paypal</field>
+        <field name="prefix">PP_</field>
+        <field name="active">True</field>
+
+        <!-- Sandbox host by default. Change to https://api-m.paypal.com for live -->
+        <field name="provider_host">https://api-m.sandbox.paypal.com</field>
+        <field name="paypal_mode">sandbox</field>
+        <field name="paypal_usd_exchange_rate">26300.0</field>
+
+        <!-- TODO: Replace with your actual PayPal credentials -->
+        <field name="provider_account_id">YOUR_PAYPAL_CLIENT_ID</field>
+        <field name="provider_secret">YOUR_PAYPAL_CLIENT_SECRET</field>
+
+        <field name="enable_cors">False</field>
+    </record>
+</odoo>

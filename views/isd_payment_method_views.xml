@@ -55,16 +55,28 @@
 
                     <notebook>
                         <page string="Provider Configuration" name="provider_config">
+                            <!-- Shared fields -->
                             <group>
-                                <group string="API Settings">
-                                    <field name="sepay_host" placeholder="https://my.sepay.vn"/>
-                                    <field name="sepay_qr_host" placeholder="https://qr.sepay.vn"/>
-                                    <field name="sepay_api_token" password="True" placeholder="Your API Token"/>
+                                <group string="Connection">
+                                    <field name="provider_host" placeholder="https://my.sepay.vn  or  https://api-m.sandbox.paypal.com"/>
+                                    <field name="provider_account_id" placeholder="SePay: account number | PayPal: Client ID"/>
+                                    <field name="provider_secret" password="True" placeholder="SePay: API token | PayPal: Client Secret"/>
                                 </group>
-                                <group string="Bank Account">
-                                    <field name="sepay_acc_number" placeholder="0123456789"/>
+                            </group>
+
+                            <!-- SePay-specific fields -->
+                            <group invisible="payment_provider != 'sepay'">
+                                <group string="SePay Settings">
+                                    <field name="sepay_qr_host" placeholder="https://qr.sepay.vn"/>
                                     <field name="sepay_acc_bank" placeholder="VCB"/>
-                                    <field name="sepay_prefix_transaction_id" placeholder="PREFIX_"/>
+                                </group>
+                            </group>
+
+                            <!-- PayPal-specific fields -->
+                            <group invisible="payment_provider != 'paypal'">
+                                <group string="PayPal Settings">
+                                    <field name="paypal_mode" widget="radio"/>
+                                    <field name="paypal_usd_exchange_rate"/>
                                 </group>
                             </group>
                         </page>
@@ -148,6 +160,7 @@
                 <filter string="Not Configured" name="not_configured" domain="[('is_configured','=',False)]"/>
                 <separator/>
                 <filter string="SePay" name="sepay" domain="[('payment_provider','=','sepay')]"/>
+                <filter string="PayPal" name="paypal" domain="[('payment_provider','=','paypal')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Provider" name="group_provider" context="{'group_by':'payment_provider'}"/>
                     <filter string="Company" name="group_company" context="{'group_by':'company_id'}" groups="base.group_multi_company"/>

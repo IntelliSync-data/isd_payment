@@ -85,6 +85,29 @@ class IsdPaymentTransaction(models.Model):
         help='Transaction content from SePay'
     )
 
+    # PayPal Response
+    paypal_order_id = fields.Char(
+        string='PayPal Order ID',
+        help='Order ID from PayPal'
+    )
+    paypal_capture_id = fields.Char(
+        string='PayPal Capture ID',
+        help='Capture ID from PayPal after payment completion'
+    )
+    paypal_payer_email = fields.Char(
+        string='Payer Email',
+        help='Email of PayPal payer'
+    )
+    paypal_redirect_url = fields.Char(
+        string='PayPal Redirect URL',
+        help='URL to redirect user to PayPal approval page'
+    )
+    amount_usd = fields.Float(
+        string='Amount (USD)',
+        digits=(16, 4),
+        help='Transaction amount in USD (for PayPal)'
+    )
+
     # Dates
     confirmed_at = fields.Datetime(
         string='Confirmed At',
@@ -167,7 +190,7 @@ class IsdPaymentTransaction(models.Model):
         return transaction_id
 
     def mark_as_confirmed(self, sepay_data=None):
-        """Mark transaction as confirmed"""
+        """Mark transaction as confirmed (SePay)"""
         self.ensure_one()
         vals = {
             'status': 'confirmed',
@@ -178,6 +201,21 @@ class IsdPaymentTransaction(models.Model):
                 'sepay_transaction_id': sepay_data.get('id'),
                 'sepay_reference': sepay_data.get('reference_number'),
                 'sepay_transaction_content': sepay_data.get('transaction_content'),
+            })
+        self.write(vals)
+
+    def mark_as_confirmed_paypal(self, paypal_data=None):
+        """Mark transaction as confirmed (PayPal)"""
+        self.ensure_one()
+        vals = {
+            'status': 'confirmed',
+            'confirmed_at': fields.Datetime.now(),
+        }
+        if paypal_data:
+            vals.update({
+                'paypal_order_id': paypal_data.get('order_id'),
+                'paypal_capture_id': paypal_data.get('capture_id'),
+                'paypal_payer_email': paypal_data.get('payer_email'),
             })
         self.write(vals)
 

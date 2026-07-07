@@ -80,6 +80,10 @@ class ApiDocumentationWizard(models.TransientModel):
             method = wizard.payment_method_id
             base_url = method.api_base_url
 
+            if method.payment_provider == 'paypal':
+                wizard.api_documentation = self._generate_paypal_docs(method, base_url)
+                continue
+
             html = f'''
             <div class="api-documentation">
                 <style>
@@ -166,10 +170,10 @@ class ApiDocumentationWizard(models.TransientModel):
                         <pre>{{
   "success": true,
   "data": {{
-    "transaction_id": "{method.sepay_prefix_transaction_id}ABC123XYZ",
+    "transaction_id": "{method.prefix}ABC123XYZ",
     "qr_url": "https://qr.sepay.vn/img?acc=...",
     "amount": 50000,
-    "bank_account": "{method.sepay_acc_number}",
+    "bank_account": "{method.provider_account_id}",
     "bank_code": "{method.sepay_acc_bank}",
     "created_at": "2026-04-04 10:30:00"
   }}
@@ -219,7 +223,7 @@ print(data['data']['qr_url'])</pre>
                     <h4>Request Body:</h4>
                     <div class="code-block">
                         <pre>{{
-  "transaction_id": "{method.sepay_prefix_transaction_id}ABC123XYZ",
+  "transaction_id": "{method.prefix}ABC123XYZ",
   "amount": 50000
 }}</pre>
                     </div>
@@ -231,7 +235,7 @@ print(data['data']['qr_url'])</pre>
   "status": "confirmed",
   "message": "Payment confirmed via SePay",
   "data": {{
-    "transaction_id": "{method.sepay_prefix_transaction_id}ABC123XYZ",
+    "transaction_id": "{method.prefix}ABC123XYZ",
     "amount": 50000,
     "confirmed_at": "2026-04-04 10:35:00",
     "sepay_transaction_id": "SP123456789",
@@ -253,7 +257,7 @@ print(data['data']['qr_url'])</pre>
                     <div class="code-block">
                         <pre>curl -X POST {base_url}/confirm \\
   -H "Content-Type: application/json" \\
-  -d '{{"transaction_id": "{method.sepay_prefix_transaction_id}ABC123", "amount": 50000}}'</pre>
+  -d '{{"transaction_id": "{method.prefix}ABC123", "amount": 50000}}'</pre>
                     </div>
                 </div>
 
@@ -271,7 +275,7 @@ print(data['data']['qr_url'])</pre>
                         <pre>{{
   "success": true,
   "data": {{
-    "transaction_id": "{method.sepay_prefix_transaction_id}ABC123XYZ",
+    "transaction_id": "{method.prefix}ABC123XYZ",
     "amount": 50000,
     "status": "confirmed",
     "qr_url": "https://qr.sepay.vn/img?...",
@@ -284,7 +288,7 @@ print(data['data']['qr_url'])</pre>
 
                     <h4>cURL Example:</h4>
                     <div class="code-block">
-                        <pre>curl -X GET {base_url}/transaction/{method.sepay_prefix_transaction_id}ABC123</pre>
+                        <pre>curl -X GET {base_url}/transaction/{method.prefix}ABC123</pre>
                     </div>
                 </div>
 
@@ -316,7 +320,7 @@ print(data['data']['qr_url'])</pre>
     "offset": 0,
     "transactions": [
       {{
-        "transaction_id": "{method.sepay_prefix_transaction_id}ABC123",
+        "transaction_id": "{method.prefix}ABC123",
         "amount": 50000,
         "status": "confirmed",
         "created_at": "2026-04-04 10:30:00",
@@ -373,3 +377,153 @@ print(data['data']['qr_url'])</pre>
             '''
 
             wizard.api_documentation = html
+
+    def _generate_paypal_docs(self, method, base_url):
+        """Generate PayPal-specific API documentation"""
+        return f'''
+        <div class="api-documentation">
+            <style>
+                .api-documentation {{ font-family: 'Courier New', monospace; font-size: 13px; }}
+                .api-section {{ background: #f8f9fa; border-left: 4px solid #003087; padding: 15px; margin: 20px 0; }}
+                .api-endpoint {{ background: #28a745; color: white; padding: 5px 10px; border-radius: 3px; display: inline-block; margin-right: 10px; font-weight: bold; }}
+                .api-url {{ background: #e9ecef; padding: 5px 10px; border-radius: 3px; display: inline-block; font-family: monospace; }}
+                .code-block {{ background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow-x: auto; margin: 10px 0; }}
+                .code-block pre {{ margin: 0; white-space: pre-wrap; }}
+                .api-description {{ color: #6c757d; margin: 10px 0; }}
+                h3 {{ color: #003087; border-bottom: 2px solid #003087; padding-bottom: 5px; }}
+                h4 {{ color: #009cde; margin-top: 15px; }}
+            </style>
+
+            <h2>API Documentation - {method.name} (PayPal)</h2>
+
+            <div style="background: #e7f0ff; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <p><b>Base URL:</b> <code>{base_url}</code></p>
+                <p><b>Provider:</b> PayPal</p>
+                <p><b>Mode:</b> {method.paypal_mode or 'sandbox'}</p>
+                <p><b>PayPal Host:</b> {method.provider_host or 'N/A'}</p>
+                <p><b>CORS:</b> {{'Enabled' if method.enable_cors else 'Disabled (Public API)'}}</p>
+            </div>
+
+            <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h4>PayPal Payment Flow</h4>
+                <ol>
+                    <li>Call <b>/create</b> → get <code>redirect_url</code> and <code>transaction_id</code> (= PayPal Order ID)</li>
+                    <li>Redirect user to <code>redirect_url</code> to approve payment on PayPal</li>
+                    <li>After user approves, call <b>/confirm</b> with the <code>transaction_id</code> to capture payment</li>
+                    <li>Poll <b>/transaction/&#123;id&#125;</b> to check status</li>
+                </ol>
+                <p><small>Amount is converted from VND to USD using exchange rate: <b>{method.paypal_usd_exchange_rate or 26300} VND/USD</b></small></p>
+            </div>
+
+            <!-- API 1: Create Payment -->
+            <div class="api-section">
+                <h3>1. Create Payment (Get PayPal Redirect URL)</h3>
+                <p><span class="api-endpoint">POST</span><span class="api-url">{base_url}/create</span></p>
+                <p class="api-description">Create a PayPal order. Returns a redirect URL for user approval.</p>
+
+                <h4>Request Body:</h4>
+                <div class="code-block"><pre>{{
+  "amount": 500000,
+  "description": "Order #12345"
+}}</pre></div>
+
+                <h4>Response (Success):</h4>
+                <div class="code-block"><pre>{{
+  "success": true,
+  "data": {{
+    "transaction_id": "PAYPAL_ORDER_ID_HERE",
+    "redirect_url": "https://www.sandbox.paypal.com/checkoutnow?token=...",
+    "amount": 500000,
+    "amount_usd": 19.01,
+    "created_at": "2026-04-04 10:30:00"
+  }}
+}}</pre></div>
+
+                <h4>cURL Example:</h4>
+                <div class="code-block"><pre>curl -X POST {base_url}/create \\
+  -H "Content-Type: application/json" \\
+  -d '{{"amount": 500000, "description": "Test"}}'</pre></div>
+
+                <h4>JavaScript Example:</h4>
+                <div class="code-block"><pre>const res = await fetch('{base_url}/create', {{
+  method: 'POST',
+  headers: {{'Content-Type': 'application/json'}},
+  body: JSON.stringify({{amount: 500000}})
+}});
+const data = await res.json();
+// Redirect user to PayPal
+window.location.href = data.data.redirect_url;</pre></div>
+            </div>
+
+            <!-- API 2: Confirm Payment -->
+            <div class="api-section">
+                <h3>2. Confirm Payment (Capture PayPal Order)</h3>
+                <p><span class="api-endpoint">POST</span><span class="api-url">{base_url}/confirm</span></p>
+                <p class="api-description">Capture the PayPal order after user approves. Call this after the user returns from PayPal.</p>
+
+                <h4>Request Body:</h4>
+                <div class="code-block"><pre>{{
+  "transaction_id": "PAYPAL_ORDER_ID_HERE",
+  "amount": 500000
+}}</pre></div>
+
+                <h4>Response (Confirmed):</h4>
+                <div class="code-block"><pre>{{
+  "success": true,
+  "status": "confirmed",
+  "message": "Payment confirmed via PayPal",
+  "data": {{
+    "transaction_id": "PAYPAL_ORDER_ID_HERE",
+    "amount": 500000,
+    "amount_usd": 19.01,
+    "confirmed_at": "2026-04-04 10:35:00",
+    "paypal_order_id": "PAYPAL_ORDER_ID_HERE",
+    "paypal_capture_id": "CAPTURE_ID",
+    "paypal_payer_email": "buyer@example.com"
+  }}
+}}</pre></div>
+
+                <h4>cURL Example:</h4>
+                <div class="code-block"><pre>curl -X POST {base_url}/confirm \\
+  -H "Content-Type: application/json" \\
+  -d '{{"transaction_id": "ORDER_ID", "amount": 500000}}'</pre></div>
+            </div>
+
+            <!-- API 3: Get Transaction -->
+            <div class="api-section">
+                <h3>3. Get Transaction Status</h3>
+                <p><span class="api-endpoint">GET</span><span class="api-url">{base_url}/transaction/{{transaction_id}}</span></p>
+                <p class="api-description">Get current status of a transaction.</p>
+
+                <h4>Response:</h4>
+                <div class="code-block"><pre>{{
+  "success": true,
+  "data": {{
+    "transaction_id": "PAYPAL_ORDER_ID",
+    "amount": 500000,
+    "status": "confirmed",
+    "created_at": "2026-04-04 10:30:00",
+    "confirmed_at": "2026-04-04 10:35:00",
+    "expired_at": "2026-04-04 11:30:00"
+  }}
+}}</pre></div>
+
+                <h4>cURL Example:</h4>
+                <div class="code-block"><pre>curl -X GET {base_url}/transaction/PAYPAL_ORDER_ID</pre></div>
+            </div>
+
+            <!-- Error Codes -->
+            <div class="api-section">
+                <h3>Error Codes</h3>
+                <ul>
+                    <li><code>METHOD_NOT_FOUND</code>: Payment method not found or inactive</li>
+                    <li><code>CORS_BLOCKED</code>: Origin not allowed</li>
+                    <li><code>INVALID_AMOUNT</code>: Amount validation failed</li>
+                    <li><code>PAYPAL_ERROR</code>: PayPal API returned an error</li>
+                    <li><code>TRANSACTION_NOT_FOUND</code>: Transaction doesn't exist</li>
+                    <li><code>TRANSACTION_EXPIRED</code>: Transaction expired (&gt;1 hour)</li>
+                    <li><code>INTERNAL_ERROR</code>: Server error</li>
+                </ul>
+            </div>
+        </div>
+        '''

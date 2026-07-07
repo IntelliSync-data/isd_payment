@@ -91,6 +91,125 @@ class IsdPaymentController(http.Controller):
 
         return Response('', status=200, headers=cors_headers)
 
+    def _create_paypal_payment(self, payment_method, amount):
+        """Create PayPal order and return redirect URL"""
+        try:
+            token = self._get_paypal_token(payment_method)
+            order_url = f"{payment_method.provider_host}/v2/checkout/orders"
+            exchange_rate = payment_method.paypal_usd_exchange_rate or 26300.0
+            amount_usd = round(amount / exchange_rate, 2)
+
+            body = {
+                "intent": "CAPTURE",
+                "purchase_units": [{
+                    "amount": {
+                        "currency_code": "USD",
+                        "value": str(amount_usd),
+                    }
+                }],
+                "application_context": {
+                    "locale": "en-US",
+                    "shipping_preference": "NO_SHIPPING",
+                    "payment_method": {
+                        "payer_selected": "PAYPAL",
+                        "payee_preferred": "IMMEDIATE_PAYMENT_REQUIRED",
+                    },
+                },
+            }
+
+            response = requests.post(
+                order_url,
+                headers={"Content-Type": "application/json", "Authorization": token},
+                json=body,
+                timeout=30
+            )
+            if response.status_code not in (200, 201):
+                _logger.error(f"PayPal create order error: {response.status_code} {response.text}")
+                return {'found': False, 'message': f'PayPal API error: {response.status_code}'}
+
+            data = response.json()
+            order_id = data.get('id', '')
+            redirect_url = next(
+                (link['href'] for link in data.get('links', []) if link.get('rel') == 'approve'),
+                None
+            )
+            return {
+                'found': True,
+                'order_id': order_id,
+                'redirect_url': redirect_url,
+                'amount_usd': amount_usd,
+            }
+        except requests.Timeout:
+            return {'found': False, 'message': 'PayPal API timeout'}
+        except Exception as e:
+            _logger.exception("Error creating PayPal order")
+            return {'found': False, 'message': str(e)}
+
+    def _check_paypal_transaction(self, payment_method, paypal_order_id):
+        """Capture a PayPal order to confirm payment"""
+        try:
+            token = self._get_paypal_token(payment_method)
+            capture_url = f"{payment_method.provider_host}/v2/checkout/orders/{paypal_order_id}/capture"
+
+            response = requests.post(
+                capture_url,
+                headers={"Content-Type": "application/json", "Authorization": token},
+                timeout=30
+            )
+            if response.status_code not in (200, 201):
+                _logger.error(f"PayPal capture error: {response.status_code} {response.text}")
+                return {'found': False, 'message': f'PayPal capture error: {response.status_code}'}
+
+            data = response.json()
+            status = data.get('status', '')
+            if status != 'COMPLETED':
+                return {'found': False, 'message': f'PayPal order not completed, status: {status}'}
+
+            # Extract capture details
+            capture_id = None
+            payer_email = None
+            purchase_units = data.get('purchase_units', [])
+            if purchase_units:
+                captures = purchase_units[0].get('payments', {}).get('captures', [])
+                if captures:
+                    capture_id = captures[0].get('id')
+
+            payer = data.get('payer', {})
+            payer_email = payer.get('email_address')
+
+            return {
+                'found': True,
+                'data': {
+                    'order_id': paypal_order_id,
+                    'capture_id': capture_id,
+                    'payer_email': payer_email,
+                }
+            }
+        except requests.Timeout:
+            return {'found': False, 'message': 'PayPal API timeout'}
+        except Exception as e:
+            _logger.exception("Error capturing PayPal order")
+            return {'found': False, 'message': str(e)}
+
+    def _get_paypal_token(self, payment_method):
+        """Get PayPal Bearer token via OAuth2"""
+        token_url = f"{payment_method.provider_host}/v1/oauth2/token"
+        response = requests.post(
+            token_url,
+            auth=(payment_method.provider_account_id, payment_method.provider_secret),
+            data={"grant_type": "client_credentials"},
+            headers={"Accept": "application/json", "Accept-Language": "en_US"},
+            timeout=30
+        )
+        if response.status_code not in (200, 201):
+            raise Exception(f"Could not get PayPal token: {response.status_code}")
+        data = response.json()
+        token_type = data.get('token_type', 'Bearer')
+        access_token = data.get('access_token', '')
+        if not access_token:
+            raise Exception("PayPal token is empty")
+        return f"{token_type} {access_token}"
+
     # ==========================================
     # API Endpoint 1: Create Payment
     # ==========================================
@@ -144,43 +263,77 @@ class IsdPaymentController(http.Controller):
                     'error_code': 'AMOUNT_TOO_LARGE'
                 }
 
-            # Generate transaction ID
-            transaction_id = request.env['isd_payment.transaction'].sudo().generate_transaction_id(
-                payment_method.sepay_prefix_transaction_id
-            )
-
-            # Build QR URL
-            qr_url = f"{payment_method.sepay_qr_host}/img?acc={payment_method.sepay_acc_number}&bank={payment_method.sepay_acc_bank}&amount={int(amount)}&des={quote(transaction_id)}"
-
             # Get request info
             request_origin = request.httprequest.headers.get('Origin', '')
             request_ip = request.httprequest.remote_addr
 
-            # Create transaction record
-            transaction = request.env['isd_payment.transaction'].sudo().create({
-                'payment_method_id': payment_method.id,
-                'transaction_id': transaction_id,
-                'amount': amount,
-                'description': description,
-                'qr_url': qr_url,
-                'bank_account': payment_method.sepay_acc_number,
-                'bank_code': payment_method.sepay_acc_bank,
-                'status': 'pending',
-                'request_origin': request_origin,
-                'request_ip': request_ip,
-            })
+            if payment_method.payment_provider == 'paypal':
+                # PayPal: create order and return redirect URL
+                paypal_result = self._create_paypal_payment(payment_method, amount)
+                if not paypal_result.get('found'):
+                    return {
+                        'success': False,
+                        'error': paypal_result.get('message', 'PayPal error'),
+                        'error_code': 'PAYPAL_ERROR'
+                    }
 
-            return {
-                'success': True,
-                'data': {
-                    'transaction_id': transaction.transaction_id,
-                    'qr_url': qr_url,
+                order_id = paypal_result['order_id']
+                transaction = request.env['isd_payment.transaction'].sudo().create({
+                    'payment_method_id': payment_method.id,
+                    'transaction_id': order_id,
                     'amount': amount,
-                    'bank_account': payment_method.sepay_acc_number,
-                    'bank_code': payment_method.sepay_acc_bank,
-                    'created_at': transaction.create_date.strftime('%Y-%m-%d %H:%M:%S') if transaction.create_date else None,
+                    'amount_usd': paypal_result['amount_usd'],
+                    'description': description,
+                    'paypal_order_id': order_id,
+                    'paypal_redirect_url': paypal_result.get('redirect_url'),
+                    'status': 'pending',
+                    'request_origin': request_origin,
+                    'request_ip': request_ip,
+                })
+
+                return {
+                    'success': True,
+                    'data': {
+                        'transaction_id': order_id,
+                        'redirect_url': paypal_result.get('redirect_url'),
+                        'amount': amount,
+                        'amount_usd': paypal_result['amount_usd'],
+                        'created_at': transaction.create_date.strftime('%Y-%m-%d %H:%M:%S') if transaction.create_date else None,
+                    }
                 }
-            }
+
+            else:
+                # SePay: generate QR code
+                transaction_id = request.env['isd_payment.transaction'].sudo().generate_transaction_id(
+                    payment_method.prefix
+                )
+
+                qr_url = f"{payment_method.sepay_qr_host}/img?acc={payment_method.provider_account_id}&bank={payment_method.sepay_acc_bank}&amount={int(amount)}&des={quote(transaction_id)}"
+
+                transaction = request.env['isd_payment.transaction'].sudo().create({
+                    'payment_method_id': payment_method.id,
+                    'transaction_id': transaction_id,
+                    'amount': amount,
+                    'description': description,
+                    'qr_url': qr_url,
+                    'bank_account': payment_method.provider_account_id,
+                    'bank_code': payment_method.sepay_acc_bank,
+                    'status': 'pending',
+                    'request_origin': request_origin,
+                    'request_ip': request_ip,
+                })
+
+                return {
+                    'success': True,
+                    'data': {
+                        'transaction_id': transaction.transaction_id,
+                        'qr_url': qr_url,
+                        'amount': amount,
+                        'bank_account': payment_method.provider_account_id,
+                        'bank_code': payment_method.sepay_acc_bank,
+                        'created_at': transaction.create_date.strftime('%Y-%m-%d %H:%M:%S') if transaction.create_date else None,
+                    }
+                }
 
         except Exception as e:
             _logger.exception("Error creating payment")
@@ -277,36 +430,63 @@ class IsdPaymentController(http.Controller):
             # Mark as processing
             transaction.mark_as_processing()
 
-            # Call SePay API
-            sepay_result = self._check_sepay_transaction(
-                payment_method,
-                transaction_id,
-                int(amount),
-                prefix=payment_method.sepay_prefix_transaction_id
-            )
+            if payment_method.payment_provider == 'paypal':
+                # PayPal: capture the order using PayPal order ID
+                paypal_order_id = transaction.paypal_order_id or transaction_id
+                paypal_result = self._check_paypal_transaction(payment_method, paypal_order_id)
 
-            if sepay_result.get('found'):
-                # Payment confirmed
-                transaction.mark_as_confirmed(sepay_result.get('data'))
-                return {
-                    'success': True,
-                    'status': 'confirmed',
-                    'message': 'Payment confirmed via SePay',
-                    'data': {
-                        'transaction_id': transaction.transaction_id,
-                        'amount': transaction.amount,
-                        'confirmed_at': transaction.confirmed_at.strftime('%Y-%m-%d %H:%M:%S') if transaction.confirmed_at else None,
-                        'sepay_transaction_id': transaction.sepay_transaction_id,
-                        'sepay_reference': transaction.sepay_reference,
+                if paypal_result.get('found'):
+                    transaction.mark_as_confirmed_paypal(paypal_result.get('data'))
+                    return {
+                        'success': True,
+                        'status': 'confirmed',
+                        'message': 'Payment confirmed via PayPal',
+                        'data': {
+                            'transaction_id': transaction.transaction_id,
+                            'amount': transaction.amount,
+                            'amount_usd': transaction.amount_usd,
+                            'confirmed_at': transaction.confirmed_at.strftime('%Y-%m-%d %H:%M:%S') if transaction.confirmed_at else None,
+                            'paypal_order_id': transaction.paypal_order_id,
+                            'paypal_capture_id': transaction.paypal_capture_id,
+                            'paypal_payer_email': transaction.paypal_payer_email,
+                        }
                     }
-                }
+                else:
+                    return {
+                        'success': True,
+                        'status': 'processing',
+                        'message': paypal_result.get('message', 'PayPal payment is being processed')
+                    }
+
             else:
-                # Still processing
-                return {
-                    'success': True,
-                    'status': 'processing',
-                    'message': sepay_result.get('message', 'Payment is being processed')
-                }
+                # SePay: poll SePay API
+                sepay_result = self._check_sepay_transaction(
+                    payment_method,
+                    transaction_id,
+                    int(amount),
+                    prefix=payment_method.prefix
+                )
+
+                if sepay_result.get('found'):
+                    transaction.mark_as_confirmed(sepay_result.get('data'))
+                    return {
+                        'success': True,
+                        'status': 'confirmed',
+                        'message': 'Payment confirmed via SePay',
+                        'data': {
+                            'transaction_id': transaction.transaction_id,
+                            'amount': transaction.amount,
+                            'confirmed_at': transaction.confirmed_at.strftime('%Y-%m-%d %H:%M:%S') if transaction.confirmed_at else None,
+                            'sepay_transaction_id': transaction.sepay_transaction_id,
+                            'sepay_reference': transaction.sepay_reference,
+                        }
+                    }
+                else:
+                    return {
+                        'success': True,
+                        'status': 'processing',
+                        'message': sepay_result.get('message', 'Payment is being processed')
+                    }
 
         except Exception as e:
             _logger.exception("Error confirming payment")
@@ -324,7 +504,7 @@ class IsdPaymentController(http.Controller):
             on_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
 
             # Build API URL
-            url = f"{payment_method.sepay_host}/userapi/transactions/list"
+            url = f"{payment_method.provider_host}/userapi/transactions/list"
             params = {
                 'transaction_date_min': on_date,
                 'amount_in': amount,
@@ -333,7 +513,7 @@ class IsdPaymentController(http.Controller):
 
             # Headers
             headers = {
-                'Authorization': f'Bearer {payment_method.sepay_api_token}',
+                'Authorization': f'Bearer {payment_method.provider_secret}',
                 'Accept': 'application/json',
             }
 
