@@ -84,6 +84,10 @@ class ApiDocumentationWizard(models.TransientModel):
                 wizard.api_documentation = self._generate_paypal_docs(method, base_url)
                 continue
 
+            if method.payment_provider == 'vtcpay':
+                wizard.api_documentation = self._generate_vtcpay_docs(method, base_url)
+                continue
+
             html = f'''
             <div class="api-documentation">
                 <style>
@@ -377,6 +381,120 @@ print(data['data']['qr_url'])</pre>
             '''
 
             wizard.api_documentation = html
+
+    def _generate_vtcpay_docs(self, method, base_url):
+        """Generate VTC Pay-specific API documentation"""
+        return f'''
+        <div class="api-documentation">
+            <style>
+                .api-documentation {{ font-family: 'Courier New', monospace; font-size: 13px; }}
+                .api-section {{ background: #f8f9fa; border-left: 4px solid #e74c3c; padding: 15px; margin: 20px 0; }}
+                .api-endpoint {{ background: #28a745; color: white; padding: 5px 10px; border-radius: 3px; display: inline-block; margin-right: 10px; font-weight: bold; }}
+                .api-url {{ background: #e9ecef; padding: 5px 10px; border-radius: 3px; display: inline-block; font-family: monospace; }}
+                .code-block {{ background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow-x: auto; margin: 10px 0; }}
+                .code-block pre {{ margin: 0; white-space: pre-wrap; }}
+                .api-description {{ color: #6c757d; margin: 10px 0; }}
+                h3 {{ color: #c0392b; border-bottom: 2px solid #c0392b; padding-bottom: 5px; }}
+                h4 {{ color: #e74c3c; margin-top: 15px; }}
+            </style>
+
+            <h2>API Documentation - {method.name} (VTC Pay)</h2>
+
+            <div style="background: #fdf2f2; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <p><b>Base URL:</b> <code>{base_url}</code></p>
+                <p><b>Provider:</b> VTC Pay</p>
+                <p><b>VTC Host:</b> {method.provider_host or 'N/A'}</p>
+                <p><b>Website ID:</b> {method.provider_account_id or 'N/A'}</p>
+                <p><b>CORS:</b> {{'Enabled' if method.enable_cors else 'Disabled (Public API)'}}</p>
+            </div>
+
+            <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h4>VTC Pay Payment Flow</h4>
+                <ol>
+                    <li>Call <b>/create</b> → get <code>redirect_url</code> and <code>transaction_id</code></li>
+                    <li>Redirect user to <code>redirect_url</code> to complete payment on VTC Pay</li>
+                    <li>VTC Pay redirects back to your IPN URL on completion</li>
+                    <li>Call <b>/confirm</b> with the <code>transaction_id</code> to verify payment status</li>
+                </ol>
+                <p><small>Amount is multiplied by 1000 before sending to VTC Pay (unit conversion).</small></p>
+            </div>
+
+            <!-- API 1: Create Payment -->
+            <div class="api-section">
+                <h3>1. Create Payment (Get VTC Pay Redirect URL)</h3>
+                <p><span class="api-endpoint">POST</span><span class="api-url">{base_url}/create</span></p>
+                <p class="api-description">Create a VTC Pay order. Returns a redirect URL for user to complete payment.</p>
+
+                <h4>Request Body:</h4>
+                <div class="code-block"><pre>{{
+  "amount": 500,
+  "description": "Order #12345"
+}}</pre></div>
+
+                <h4>Response (Success):</h4>
+                <div class="code-block"><pre>{{
+  "success": true,
+  "data": {{
+    "transaction_id": "uuid-generated-id",
+    "redirect_url": "https://vtcpay.vn/checkout.html?...",
+    "amount": 500,
+    "created_at": "2026-04-04 10:30:00"
+  }}
+}}</pre></div>
+
+                <h4>cURL Example:</h4>
+                <div class="code-block"><pre>curl -X POST {base_url}/create \\
+  -H "Content-Type: application/json" \\
+  -d '{{"amount": 500, "description": "Test"}}'</pre></div>
+            </div>
+
+            <!-- API 2: Confirm Payment -->
+            <div class="api-section">
+                <h3>2. Confirm Payment (Poll VTC Pay Status)</h3>
+                <p><span class="api-endpoint">POST</span><span class="api-url">{base_url}/confirm</span></p>
+                <p class="api-description">Check VTC Pay order status via their API.</p>
+
+                <h4>Request Body:</h4>
+                <div class="code-block"><pre>{{
+  "transaction_id": "uuid-generated-id",
+  "amount": 500
+}}</pre></div>
+
+                <h4>Response (Confirmed):</h4>
+                <div class="code-block"><pre>{{
+  "success": true,
+  "status": "confirmed",
+  "message": "Payment confirmed via VTC Pay",
+  "data": {{
+    "transaction_id": "uuid-generated-id",
+    "amount": 500,
+    "confirmed_at": "2026-04-04 10:35:00"
+  }}
+}}</pre></div>
+            </div>
+
+            <!-- API 3: Get Transaction -->
+            <div class="api-section">
+                <h3>3. Get Transaction Status</h3>
+                <p><span class="api-endpoint">GET</span><span class="api-url">{base_url}/transaction/{{transaction_id}}</span></p>
+                <div class="code-block"><pre>curl -X GET {base_url}/transaction/YOUR_TRANSACTION_ID</pre></div>
+            </div>
+
+            <!-- Error Codes -->
+            <div class="api-section">
+                <h3>Error Codes</h3>
+                <ul>
+                    <li><code>METHOD_NOT_FOUND</code>: Payment method not found or inactive</li>
+                    <li><code>CORS_BLOCKED</code>: Origin not allowed</li>
+                    <li><code>INVALID_AMOUNT</code>: Amount validation failed</li>
+                    <li><code>VTCPAY_ERROR</code>: VTC Pay API returned an error</li>
+                    <li><code>TRANSACTION_NOT_FOUND</code>: Transaction doesn't exist</li>
+                    <li><code>TRANSACTION_EXPIRED</code>: Transaction expired (&gt;1 hour)</li>
+                    <li><code>INTERNAL_ERROR</code>: Server error</li>
+                </ul>
+            </div>
+        </div>
+        '''
 
     def _generate_paypal_docs(self, method, base_url):
         """Generate PayPal-specific API documentation"""

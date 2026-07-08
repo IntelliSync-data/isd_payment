@@ -31,7 +31,7 @@ class IsdPaymentMethod(models.Model):
 
     # Provider
     payment_provider = fields.Selection(
-        [('sepay', 'SePay'), ('paypal', 'PayPal')],
+        [('sepay', 'SePay'), ('paypal', 'PayPal'), ('vtcpay', 'VTC Pay')],
         string='Payment Provider',
         required=True,
         default='sepay',
@@ -68,6 +68,21 @@ class IsdPaymentMethod(models.Model):
         string='Bank Code',
         help='Bank code (e.g., VCB, TCB, MB, ...)'
     )
+    # VTC Pay-specific Configuration
+    vtc_security_code = fields.Char(
+        string='Security Code',
+        help='VTC Pay security code for callback signature verification'
+    )
+    vtc_payment_type = fields.Char(
+        string='Payment Type',
+        default='DomesticBank',
+        help='VTC Pay payment type (e.g., DomesticBank, InternationalCard)'
+    )
+    vtc_receiver_account = fields.Char(
+        string='Receiver Account',
+        help='VTC Pay receiver account number'
+    )
+
     # PayPal-specific Configuration
     paypal_mode = fields.Selection(
         [('sandbox', 'Sandbox'), ('live', 'Live')],
@@ -132,7 +147,8 @@ class IsdPaymentMethod(models.Model):
                 record.api_base_url = False
 
     @api.depends('payment_provider', 'provider_host', 'provider_account_id', 'provider_secret',
-                 'sepay_qr_host', 'sepay_acc_bank', 'paypal_mode')
+                 'sepay_qr_host', 'sepay_acc_bank',
+                 'vtc_security_code', 'vtc_receiver_account')
     def _compute_is_configured(self):
         for record in self:
             if record.payment_provider == 'paypal':
@@ -141,7 +157,14 @@ class IsdPaymentMethod(models.Model):
                     record.provider_account_id,
                     record.provider_secret,
                 ])
-            else:
+            elif record.payment_provider == 'vtcpay':
+                record.is_configured = all([
+                    record.provider_host,
+                    record.provider_account_id,
+                    record.vtc_security_code,
+                    record.vtc_receiver_account,
+                ])
+            else:  # sepay
                 record.is_configured = all([
                     record.provider_host,
                     record.provider_account_id,

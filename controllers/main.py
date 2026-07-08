@@ -91,6 +91,128 @@ class IsdPaymentController(http.Controller):
 
         return Response('', status=200, headers=cors_headers)
 
+    def _create_vtcpay_payment(self, payment_method, amount, ipn_url=''):
+        """Create VTC Pay payment URL"""
+        try:
+            import hashlib
+            import urllib.parse
+            import uuid
+
+            transaction_id = str(uuid.uuid4())
+            vtc_amount = int(amount) * 1000
+
+            query_params = {
+                'amount': str(vtc_amount),
+                'bill_to_email': '',
+                'bill_to_phone': '',
+                'currency': 'VND',
+                'language': 'vi',
+                'payment_type': payment_method.vtc_payment_type or 'DomesticBank',
+                'reference_number': transaction_id,
+                'url_return': urllib.parse.unquote_plus(ipn_url) if ipn_url else '',
+                'website_id': payment_method.provider_account_id,
+                'country': 'VN',
+            }
+            # Remove empty values
+            query_params = {k: v for k, v in query_params.items() if v}
+
+            signature_pattern = 'amount|bill_to_email|bill_to_phone|country|currency|language|payment_type|reference_number|url_return|website_id'
+            signature_values = []
+            for k in signature_pattern.split('|'):
+                if k in query_params:
+                    signature_values.append(query_params[k])
+            signature_values.append(payment_method.vtc_security_code)
+            signature = hashlib.sha256('|'.join(signature_values).encode()).hexdigest()
+            query_params['signature'] = signature
+
+            pay_url = f"{payment_method.provider_host}/checkout.html?" + '&'.join(
+                f"{k}={urllib.parse.quote_plus(v)}" for k, v in query_params.items()
+            )
+
+            return {
+                'found': True,
+                'transaction_id': transaction_id,
+                'redirect_url': pay_url,
+            }
+        except Exception as e:
+            _logger.exception("Error creating VTC Pay payment")
+            return {'found': False, 'message': str(e)}
+
+    def _check_vtcpay_transaction(self, payment_method, transaction_id, amount, payment_parameters=None):
+        """Check VTC Pay transaction status"""
+        try:
+            import hashlib
+            import json
+
+            if payment_parameters:
+                # Verify IPN callback signature
+                params = {}
+                for part in payment_parameters.split('&'):
+                    k, v = part.split('=', 1)
+                    params[k] = v
+
+                signature_pattern = 'amount|message|payment_type|reference_number|status|trans_ref_no|website_id'
+                signature_values = [params.get(k, '') for k in signature_pattern.split('|')]
+                signature_values.append(payment_method.vtc_security_code)
+
+                calc_signature = hashlib.sha256('|'.join(signature_values).encode()).hexdigest()
+                if params.get('signature', '').lower() != calc_signature:
+                    return {'found': False, 'message': 'Invalid VTC Pay signature'}
+
+                vtc_amount = int(amount) * 1000
+                if int(float(params.get('amount', 0))) != vtc_amount:
+                    return {'found': False, 'message': 'Amount mismatch'}
+
+                order_status = int(params.get('status', -1))
+            else:
+                # Poll VTC Pay API
+                key_sign = payment_method.provider_secret or ''
+                receiver_account = payment_method.vtc_receiver_account or ''
+                website_id = payment_method.provider_account_id or ''
+                security_code = payment_method.vtc_security_code or ''
+
+                signature = hashlib.md5(
+                    f"{key_sign}{receiver_account}{website_id}WEBSITE{security_code}".encode()
+                ).hexdigest()
+
+                url = f"{payment_method.provider_host}/api/AccountApi/VTCPayGetOrderStatus"
+                payload = json.dumps({
+                    'merchantType': 'WEBSITE',
+                    'intergratedID': website_id,
+                    'revceiverAccount': receiver_account,
+                    'sign': signature,
+                    'listMerchantOrderCode': [{'orderCode': transaction_id}],
+                })
+                response = requests.post(
+                    url,
+                    headers={'Content-Type': 'application/json'},
+                    data=payload,
+                    timeout=30
+                )
+                if response.status_code != 200:
+                    return {'found': False, 'message': f'VTC Pay API error: {response.status_code}'}
+
+                res_data = response.json()
+                order_list = res_data.get('ListOrderStatus', [])
+                if not order_list:
+                    return {'found': False, 'message': 'Order not found on VTC Pay'}
+
+                order_status = order_list[0].get('Status', -1)
+
+            # Status 1 = success, 7 = in review, -99 = in checking
+            if order_status == 1:
+                return {'found': True, 'data': {'order_status': order_status}}
+            elif order_status in (7, -99):
+                return {'found': False, 'message': 'VTC Pay payment in review'}
+            else:
+                return {'found': False, 'message': f'VTC Pay payment failed (status: {order_status})'}
+
+        except requests.Timeout:
+            return {'found': False, 'message': 'VTC Pay API timeout'}
+        except Exception as e:
+            _logger.exception("Error checking VTC Pay transaction")
+            return {'found': False, 'message': str(e)}
+
     def _create_paypal_payment(self, payment_method, amount):
         """Create PayPal order and return redirect URL"""
         try:
@@ -267,7 +389,41 @@ class IsdPaymentController(http.Controller):
             request_origin = request.httprequest.headers.get('Origin', '')
             request_ip = request.httprequest.remote_addr
 
-            if payment_method.payment_provider == 'paypal':
+            if payment_method.payment_provider == 'vtcpay':
+                # VTC Pay: generate redirect URL
+                base_url = request.env['ir.config_parameter'].sudo().get_param('web.base.url')
+                ipn_url = f"{base_url}/isd_payment/vtcpay/ipn"
+                vtc_result = self._create_vtcpay_payment(payment_method, amount, ipn_url)
+                if not vtc_result.get('found'):
+                    return {
+                        'success': False,
+                        'error': vtc_result.get('message', 'VTC Pay error'),
+                        'error_code': 'VTCPAY_ERROR'
+                    }
+
+                transaction_id = vtc_result['transaction_id']
+                transaction = request.env['isd_payment.transaction'].sudo().create({
+                    'payment_method_id': payment_method.id,
+                    'transaction_id': transaction_id,
+                    'amount': amount,
+                    'description': description,
+                    'paypal_redirect_url': vtc_result.get('redirect_url'),
+                    'status': 'pending',
+                    'request_origin': request_origin,
+                    'request_ip': request_ip,
+                })
+
+                return {
+                    'success': True,
+                    'data': {
+                        'transaction_id': transaction_id,
+                        'redirect_url': vtc_result.get('redirect_url'),
+                        'amount': amount,
+                        'created_at': transaction.create_date.strftime('%Y-%m-%d %H:%M:%S') if transaction.create_date else None,
+                    }
+                }
+
+            elif payment_method.payment_provider == 'paypal':
                 # PayPal: create order and return redirect URL
                 paypal_result = self._create_paypal_payment(payment_method, amount)
                 if not paypal_result.get('found'):
@@ -430,7 +586,30 @@ class IsdPaymentController(http.Controller):
             # Mark as processing
             transaction.mark_as_processing()
 
-            if payment_method.payment_provider == 'paypal':
+            if payment_method.payment_provider == 'vtcpay':
+                # VTC Pay: poll order status
+                vtc_result = self._check_vtcpay_transaction(payment_method, transaction_id, amount)
+
+                if vtc_result.get('found'):
+                    transaction.mark_as_confirmed()
+                    return {
+                        'success': True,
+                        'status': 'confirmed',
+                        'message': 'Payment confirmed via VTC Pay',
+                        'data': {
+                            'transaction_id': transaction.transaction_id,
+                            'amount': transaction.amount,
+                            'confirmed_at': transaction.confirmed_at.strftime('%Y-%m-%d %H:%M:%S') if transaction.confirmed_at else None,
+                        }
+                    }
+                else:
+                    return {
+                        'success': True,
+                        'status': 'processing',
+                        'message': vtc_result.get('message', 'VTC Pay payment is being processed')
+                    }
+
+            elif payment_method.payment_provider == 'paypal':
                 # PayPal: capture the order using PayPal order ID
                 paypal_order_id = transaction.paypal_order_id or transaction_id
                 paypal_result = self._check_paypal_transaction(payment_method, paypal_order_id)

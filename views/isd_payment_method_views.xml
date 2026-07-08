@@ -79,6 +79,15 @@
                                     <field name="paypal_usd_exchange_rate"/>
                                 </group>
                             </group>
+
+                            <!-- VTC Pay-specific fields -->
+                            <group invisible="payment_provider != 'vtcpay'">
+                                <group string="VTC Pay Settings">
+                                    <field name="vtc_security_code" password="True" placeholder="Security Code"/>
+                                    <field name="vtc_receiver_account" placeholder="Receiver Account"/>
+                                    <field name="vtc_payment_type" placeholder="DomesticBank"/>
+                                </group>
+                            </group>
                         </page>
 
                         <page string="CORS Configuration" name="cors_config">
@@ -161,6 +170,7 @@
                 <separator/>
                 <filter string="SePay" name="sepay" domain="[('payment_provider','=','sepay')]"/>
                 <filter string="PayPal" name="paypal" domain="[('payment_provider','=','paypal')]"/>
+                <filter string="VTC Pay" name="vtcpay" domain="[('payment_provider','=','vtcpay')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Provider" name="group_provider" context="{'group_by':'payment_provider'}"/>
                     <filter string="Company" name="group_company" context="{'group_by':'company_id'}" groups="base.group_multi_company"/>
