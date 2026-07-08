@@ -39,6 +39,7 @@
                     </div>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                     <field name="is_configured" invisible="1"/>
+                    <field name="image" widget="image" class="oe_avatar" options="{'preview_image': 'image'}"/>
 
                     <group>
                         <group>
@@ -139,6 +140,7 @@
         <field name="model">isd_payment.method</field>
         <field name="arch" type="xml">
             <list string="Payment Methods">
+                <field name="image" widget="image" options="{'size': [32, 32]}" string=" "/>
                 <field name="name"/>
                 <field name="payment_provider"/>
                 <field name="prefix"/>

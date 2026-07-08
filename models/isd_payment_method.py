@@ -17,6 +17,12 @@ class IsdPaymentMethod(models.Model):
         required=True,
         help='Display name of the payment method'
     )
+    image = fields.Image(
+        string='Image',
+        max_width=512,
+        max_height=512,
+        help='Logo or icon for this payment method (jpg/png, max 512x512)'
+    )
     active = fields.Boolean(
         string='Active',
         default=True,
