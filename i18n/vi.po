@@ -1,0 +1,880 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* isd_payment
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 18.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-07-31 00:00:00\n"
+"PO-Revision-Date: 2026-07-31 00:00:00\n"
+"Last-Translator: \n"
+"Language-Team: Vietnamese\n"
+"Language: vi\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#. module: isd_payment
+#: model:ir.model,name:isd_payment.model_isd_payment_method
+msgid "Payment Method Configuration"
+msgstr "Cấu hình phương thức thanh toán"
+
+#. module: isd_payment
+#: model:ir.model,name:isd_payment.model_isd_payment_transaction
+msgid "Payment Transaction"
+msgstr "Giao dịch thanh toán"
+
+#. module: isd_payment
+#: model:ir.model,name:isd_payment.model_isd_payment_webhook_log
+msgid "ACB Webhook Queue"
+msgstr "Hàng đợi Webhook ACB"
+
+#. module: isd_payment
+#: model:ir.model,name:isd_payment.model_isd_payment_acb_query_wizard
+msgid "ACB Transaction Query Result"
+msgstr "Kết quả truy vấn giao dịch ACB"
+
+#. module: isd_payment
+#: model:ir.model,name:isd_payment.model_isd_payment_acb_cancel_confirm
+msgid "ACB Cancel QR Confirmation"
+msgstr "Xác nhận huỷ QR Code ACB"
+
+#. module: isd_payment
+#: model:ir.model,name:isd_payment.model_isd_payment_acb_cancel_wizard
+msgid "ACB Cancel QR Result"
+msgstr "Kết quả huỷ QR Code ACB"
+
+#. module: isd_payment
+#: model:ir.model,name:isd_payment.model_isd_payment_api_documentation_wizard
+msgid "API Documentation Wizard"
+msgstr "Tài liệu API"
+#. module: isd_payment
+#: model:ir.ui.menu,name:isd_payment.menu_isd_payment_root
+msgid "ISD Payment"
+msgstr "ISD Thanh toán"
+
+#. module: isd_payment
+#: model:ir.ui.menu,name:isd_payment.menu_isd_payment_methods
+msgid "Payment Methods"
+msgstr "Phương thức thanh toán"
+
+#. module: isd_payment
+#: model:ir.ui.menu,name:isd_payment.menu_isd_payment_transactions
+msgid "Transactions"
+msgstr "Giao dịch"
+
+#. module: isd_payment
+#: model:ir.ui.menu,name:isd_payment.menu_isd_payment_config
+msgid "Configuration"
+msgstr "Cấu hình"
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__name
+msgid "Payment Method Name"
+msgstr "Tên phương thức thanh toán"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__image
+msgid "Image"
+msgstr "Hình ảnh"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__active
+msgid "Active"
+msgstr "Đang hoạt động"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__company_id
+msgid "Company"
+msgstr "Công ty"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__payment_provider
+msgid "Payment Provider"
+msgstr "Nhà cung cấp thanh toán"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_method__payment_provider__sepay
+msgid "SePay"
+msgstr "SePay"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_method__payment_provider__paypal
+msgid "PayPal"
+msgstr "PayPal"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_method__payment_provider__vtcpay
+msgid "VTC Pay"
+msgstr "VTC Pay"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_method__payment_provider__acbpay
+msgid "ACB Pay"
+msgstr "ACB Pay"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__prefix
+msgid "Prefix"
+msgstr "Tiền tố"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__provider_host
+msgid "Provider Host"
+msgstr "Máy chủ nhà cung cấp"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__provider_account_id
+msgid "Account ID"
+msgstr "Mã tài khoản"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__provider_secret
+msgid "Secret / Token"
+msgstr "Mã bí mật / Token"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__sepay_qr_host
+msgid "QR Host"
+msgstr "Máy chủ QR"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__sepay_acc_bank
+msgid "Bank Code"
+msgstr "Mã ngân hàng"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__vtc_security_code
+msgid "Security Code"
+msgstr "Mã bảo mật"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__vtc_payment_type
+msgid "Payment Type"
+msgstr "Loại thanh toán"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__vtc_receiver_account
+msgid "Receiver Account"
+msgstr "Tài khoản nhận"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__acb_api_key
+msgid "API Key"
+msgstr "Khoá API"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__acb_webhook_ip
+msgid "Webhook IP Whitelist"
+msgstr "Danh sách IP Webhook"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__acb_owner_number
+msgid "Owner Number"
+msgstr "Số chủ tài khoản"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__acb_provider_id
+msgid "Provider ID"
+msgstr "Mã nhà cung cấp"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__acb_virtual_account_prefix
+msgid "Virtual Account Prefix"
+msgstr "Tiền tố tài khoản ảo"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__acb_beneficiary_name
+msgid "Beneficiary Name"
+msgstr "Tên người thụ hưởng"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__acb_account_number
+msgid "Account Number"
+msgstr "Số tài khoản"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__acb_merchant_id
+msgid "Merchant ID"
+msgstr "Mã cửa hàng"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__acb_terminal_id
+msgid "Terminal ID"
+msgstr "Mã máy bán hàng"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__acb_user_id
+msgid "User ID"
+msgstr "Mã người dùng"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__paypal_mode
+msgid "Mode"
+msgstr "Chế độ"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_method__paypal_mode__sandbox
+msgid "Sandbox"
+msgstr "Thử nghiệm"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_method__paypal_mode__live
+msgid "Live"
+msgstr "Chính thức"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__paypal_usd_exchange_rate
+msgid "USD Exchange Rate (VND)"
+msgstr "Tỷ giá USD (VND)"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__enable_cors
+msgid "Enable CORS"
+msgstr "Bật CORS"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__allowed_origins
+msgid "Allowed Origins"
+msgstr "Nguồn cho phép"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__api_base_url
+msgid "API Base URL"
+msgstr "URL gốc API"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__transaction_count
+msgid "Transactions"
+msgstr "Giao dịch"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__pending_transaction_count
+msgid "Pending"
+msgstr "Chờ xử lý"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__confirmed_transaction_count
+msgid "Confirmed"
+msgstr "Đã xác nhận"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__is_configured
+msgid "Is Configured"
+msgstr "Đã cấu hình"
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__payment_method_id
+msgid "Payment Method"
+msgstr "Phương thức thanh toán"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__transaction_id
+msgid "Transaction ID"
+msgstr "Mã giao dịch"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__amount
+msgid "Amount"
+msgstr "Số tiền"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__currency_id
+msgid "Currency"
+msgstr "Tiền tệ"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__description
+msgid "Description"
+msgstr "Mô tả"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__branch
+msgid "Branch"
+msgstr "Chi nhánh"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__status
+msgid "Status"
+msgstr "Trạng thái"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_transaction__status__pending
+msgid "Pending"
+msgstr "Chờ xử lý"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_transaction__status__processing
+msgid "Processing"
+msgstr "Đang xử lý"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_transaction__status__confirmed
+msgid "Confirmed"
+msgstr "Đã xác nhận"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_transaction__status__cancelled
+msgid "Cancelled"
+msgstr "Đã huỷ"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_transaction__status__failed
+msgid "Failed"
+msgstr "Thất bại"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_transaction__status__expired
+msgid "Expired"
+msgstr "Hết hạn"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__qr_url
+msgid "QR URL"
+msgstr "URL mã QR"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__bank_account
+msgid "Bank Account"
+msgstr "Tài khoản ngân hàng"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__bank_code
+msgid "Bank Code"
+msgstr "Mã ngân hàng"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__sepay_transaction_id
+msgid "SePay Transaction ID"
+msgstr "Mã giao dịch SePay"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__sepay_reference
+msgid "SePay Reference"
+msgstr "Mã tham chiếu SePay"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__sepay_transaction_content
+msgid "Transaction Content"
+msgstr "Nội dung giao dịch"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__paypal_order_id
+msgid "PayPal Order ID"
+msgstr "Mã đơn hàng PayPal"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__paypal_capture_id
+msgid "PayPal Capture ID"
+msgstr "Mã thanh toán PayPal"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__paypal_payer_email
+msgid "Payer Email"
+msgstr "Email người thanh toán"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__paypal_redirect_url
+msgid "PayPal Redirect URL"
+msgstr "URL chuyển hướng PayPal"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__amount_usd
+msgid "Amount (USD)"
+msgstr "Số tiền (USD)"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__acb_trace_number
+msgid "ACB Trace Number"
+msgstr "Mã truy vết ACB"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__acb_order_id
+msgid "ACB Order ID"
+msgstr "Mã đơn hàng ACB"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__acb_virtual_account
+msgid "ACB Virtual Account"
+msgstr "Tài khoản ảo ACB"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__acb_qr_data
+msgid "ACB QR Data"
+msgstr "Dữ liệu QR ACB"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__reconciliation_status
+msgid "Reconciliation"
+msgstr "Đối soát"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_transaction__reconciliation_status__waiting
+msgid "Waiting"
+msgstr "Chờ đối soát"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_transaction__reconciliation_status__matched
+msgid "Matched"
+msgstr "Trùng khớp"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_transaction__reconciliation_status__updated
+msgid "Updated"
+msgstr "Đã cập nhật"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_transaction__reconciliation_status__review
+msgid "Review"
+msgstr "Cần kiểm tra"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_transaction__reconciliation_status__bank_data
+msgid "Bank Data"
+msgstr "Dữ liệu ngân hàng"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__reconciliation_data
+msgid "Reconciliation Data"
+msgstr "Dữ liệu đối soát"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__confirmed_at
+msgid "Confirmed At"
+msgstr "Xác nhận lúc"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__expired_at
+msgid "Expired At"
+msgstr "Hết hạn lúc"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__request_origin
+msgid "Request Origin"
+msgstr "Nguồn yêu cầu"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__request_ip
+msgid "Request IP"
+msgstr "Địa chỉ IP"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__qr_image_preview
+msgid "QR Code"
+msgstr "Mã QR"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__is_expired
+msgid "Is Expired"
+msgstr "Đã hết hạn"
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_webhook_log__request_trace
+msgid "Request Trace"
+msgstr "Mã truy vết"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_webhook_log__request_code
+msgid "Request Code"
+msgstr "Mã yêu cầu"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_webhook_log__raw_body
+msgid "Raw JSON"
+msgstr "Dữ liệu JSON"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_webhook_log__transaction_count
+msgid "Transaction Count"
+msgstr "Số giao dịch"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_webhook_log__status__pending
+msgid "Pending"
+msgstr "Chờ xử lý"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_webhook_log__status__processing
+msgid "Processing"
+msgstr "Đang xử lý"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_webhook_log__status__done
+msgid "Done"
+msgstr "Hoàn tất"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_webhook_log__status__error
+msgid "Error"
+msgstr "Lỗi"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_webhook_log__processed_at
+msgid "Processed At"
+msgstr "Xử lý lúc"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_webhook_log__processed_count
+msgid "Processed Count"
+msgstr "Số đã xử lý"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_webhook_log__request_ip
+msgid "IP"
+msgstr "IP"
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "View APIs"
+msgstr "Xem API"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "Archived"
+msgstr "Đã lưu trữ"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "Provider Configuration"
+msgstr "Cấu hình nhà cung cấp"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "Connection"
+msgstr "Kết nối"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "SePay Settings"
+msgstr "Cài đặt SePay"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "PayPal Settings"
+msgstr "Cài đặt PayPal"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "VTC Pay Settings"
+msgstr "Cài đặt VTC Pay"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "ACB Pay Settings"
+msgstr "Cài đặt ACB Pay"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "ACB Pay Security"
+msgstr "Bảo mật ACB Pay"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "CORS Configuration"
+msgstr "Cấu hình CORS"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "API Information"
+msgstr "Thông tin API"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "Quick Start"
+msgstr "Bắt đầu nhanh"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_tree
+msgid "View Transactions"
+msgstr "Xem giao dịch"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_search
+msgid "Not Configured"
+msgstr "Chưa cấu hình"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_search
+msgid "Configured"
+msgstr "Đã cấu hình"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_search
+msgid "Provider"
+msgstr "Nhà cung cấp"
+
+#. module: isd_payment
+#: model:ir.actions.act_window,help:isd_payment.action_isd_payment_method
+msgid "Create your first Payment Method"
+msgstr "Tạo phương thức thanh toán đầu tiên"
+
+#. module: isd_payment
+#: model:ir.actions.act_window,help:isd_payment.action_isd_payment_method
+msgid "Configure payment gateways to generate REST APIs for your applications."
+msgstr "Cấu hình cổng thanh toán để tạo REST API cho ứng dụng của bạn."
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_form
+msgid "Payment Info"
+msgstr "Thông tin thanh toán"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_form
+msgid "QR Code"
+msgstr "Mã QR"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_form
+msgid "Bank Details"
+msgstr "Thông tin ngân hàng"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_form
+msgid "SePay Response"
+msgstr "Phản hồi SePay"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_form
+msgid "ACB Pay"
+msgstr "ACB Pay"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_form
+msgid "Reconciliation"
+msgstr "Đối soát"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_form
+msgid "Reconciliation Data (JSON)"
+msgstr "Dữ liệu đối soát (JSON)"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_form
+msgid "API Request Info"
+msgstr "Thông tin yêu cầu API"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_form
+msgid "Created At"
+msgstr "Tạo lúc"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_tree
+msgid "Created"
+msgstr "Ngày tạo"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_tree
+msgid "Query ACB Status"
+msgstr "Truy vấn trạng thái ACB"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_tree
+msgid "Cancel QR Code"
+msgstr "Huỷ mã QR"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_tree
+msgid "Total Amount"
+msgstr "Tổng tiền"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_search
+msgid "Today"
+msgstr "Hôm nay"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_search
+msgid "This Week"
+msgstr "Tuần này"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_search
+msgid "This Month"
+msgstr "Tháng này"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_search
+msgid "Has SePay Response"
+msgstr "Có phản hồi SePay"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_search
+msgid "Created Date"
+msgstr "Ngày tạo"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_search
+msgid "Group By"
+msgstr "Nhóm theo"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_pivot
+msgid "Transaction Statistics"
+msgstr "Thống kê giao dịch"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_graph
+msgid "Transaction Chart"
+msgstr "Biểu đồ giao dịch"
+
+#. module: isd_payment
+#: model:ir.actions.act_window,help:isd_payment.action_isd_payment_transaction
+msgid "No transactions yet"
+msgstr "Chưa có giao dịch"
+
+#. module: isd_payment
+#: model:ir.actions.act_window,help:isd_payment.action_isd_payment_transaction
+msgid "Transactions are created automatically via API calls."
+msgstr "Giao dịch được tạo tự động thông qua các lệnh gọi API."
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_query_wizard_form
+msgid "ACB Transaction Status"
+msgstr "Trạng thái giao dịch ACB"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_query_wizard_form
+msgid "Payment Completed"
+msgstr "Thanh toán thành công"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_query_wizard_form
+msgid "Payment Pending"
+msgstr "Đang chờ thanh toán"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_query_wizard_form
+msgid "Payment Cancelled"
+msgstr "Giao dịch đã bị huỷ"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_query_wizard_form
+msgid "Query Failed:"
+msgstr "Truy vấn thất bại:"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_query_wizard_form
+msgid "Transaction Info"
+msgstr "Thông tin giao dịch"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_query_wizard_form
+msgid "ACB Details"
+msgstr "Chi tiết ACB"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_query_wizard_form
+msgid "Virtual Account"
+msgstr "Tài khoản ảo"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_query_wizard_form
+msgid "Raw JSON"
+msgstr "Dữ liệu JSON"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_query_wizard_form
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_cancel_wizard_form
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_recon_popup
+msgid "Close"
+msgstr "Đóng"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_cancel_wizard_form
+msgid "Cancel QR Result"
+msgstr "Kết quả huỷ QR"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_cancel_wizard_form
+msgid "QR Code has been cancelled successfully."
+msgstr "QR Code đã được huỷ thành công."
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_cancel_wizard_form
+msgid "Cancel Failed:"
+msgstr "Huỷ thất bại:"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_cancel_confirm_form
+msgid "Cancel QR Code"
+msgstr "Huỷ QR Code"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_cancel_confirm_form
+msgid "Are you sure you want to cancel this QR Code?"
+msgstr "Bạn có chắc chắn muốn huỷ QR Code này không?"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_cancel_confirm_form
+msgid "This action cannot be undone. The QR code will be invalidated on ACB's system."
+msgstr "Hành động này không thể hoàn tác. QR Code sẽ bị vô hiệu hoá trên hệ thống ACB."
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_cancel_confirm_form
+msgid "Confirm Cancel"
+msgstr "Xác nhận huỷ"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_acb_cancel_confirm_form
+msgid "Go Back"
+msgstr "Quay lại"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_transaction_recon_popup
+msgid "JSON Data from ACB"
+msgstr "Dữ liệu JSON từ ACB"
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_api_documentation_wizard_form
+msgid "API Documentation"
+msgstr "Tài liệu API"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_api_documentation_wizard_form
+msgid "CORS Settings"
+msgstr "Cài đặt CORS"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_api_documentation_wizard_form
+msgid "API Endpoints"
+msgstr "Điểm cuối API"
+#. module: isd_payment
+#: code:addons/isd_payment/models/isd_payment_method.py:0
+msgid "Provider Host must start with http:// or https://"
+msgstr "Máy chủ phải bắt đầu bằng http:// hoặc https://"
+
+#. module: isd_payment
+#: code:addons/isd_payment/models/isd_payment_method.py:0
+msgid "QR Host must start with http:// or https://"
+msgstr "Máy chủ QR phải bắt đầu bằng http:// hoặc https://"
+
+#. module: isd_payment
+#: code:addons/isd_payment/models/isd_payment_transaction.py:0
+msgid "Amount must be greater than 0"
+msgstr "Số tiền phải lớn hơn 0"
+
+#. module: isd_payment
+#: code:addons/isd_payment/models/isd_payment_transaction.py:0
+msgid "Amount exceeds maximum allowed (500,000,000 VND)"
+msgstr "Số tiền vượt quá giới hạn cho phép (500.000.000 VND)"
+
+#. module: isd_payment
+#: code:addons/isd_payment/models/isd_payment_transaction.py:0
+msgid "This action is only available for ACB Pay transactions."
+msgstr "Chức năng này chỉ dành cho giao dịch ACB Pay."
+
+#. module: isd_payment
+#: code:addons/isd_payment/models/isd_payment_transaction.py:0
+msgid "No ACB trace number found for this transaction."
+msgstr "Không tìm thấy Trace Number ACB cho giao dịch này."
+
+#. module: isd_payment
+#: code:addons/isd_payment/models/isd_payment_transaction.py:0
+msgid "Cannot cancel a confirmed transaction."
+msgstr "Không thể huỷ giao dịch đã xác nhận thanh toán."
+
+#. module: isd_payment
+#: code:addons/isd_payment/models/isd_payment_transaction.py:0
+msgid "Transaction is already cancelled."
+msgstr "Giao dịch này đã được huỷ trước đó."
+
+#. module: isd_payment
+#: model:ir.cron,name:isd_payment.cron_process_acb_webhook_queue
+msgid "ACB Webhook: Process Reconciliation"
+msgstr "ACB Webhook: Xử lý đối soát"

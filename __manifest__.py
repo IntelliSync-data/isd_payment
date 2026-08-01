@@ -3,7 +3,7 @@
     'name': 'ISD Payment',
     'version': '18.0.1.0.0',
     'category': 'ISD Modules',
-    'summary': 'Payment Gateway Integration (SePay, PayPal) with Auto-Generated REST APIs',
+    'summary': 'Payment Gateway Integration (SePay, PayPal, VTC Pay, ACB Pay) with Auto-Generated REST APIs',
     'description': """
 ISD Payment Module
 ==================
@@ -47,8 +47,10 @@ Use Cases:
         'views/isd_payment_method_views.xml',
         'views/isd_payment_transaction_views.xml',
         'wizard/api_documentation_wizard_views.xml',
+        'wizard/acb_transaction_wizard_views.xml',
         'views/isd_payment_menu.xml',
         'data/paypal_default_data.xml',
+        'data/acb_webhook_cron.xml',
     ],
     'assets': {
         'web.assets_backend': [

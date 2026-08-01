@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ACB Query Result Popup -->
+    <record id="view_acb_query_wizard_form" model="ir.ui.view">
+        <field name="name">isd_payment.acb_query_wizard.form</field>
+        <field name="model">isd_payment.acb_query_wizard</field>
+        <field name="arch" type="xml">
+            <form string="ACB Transaction Status" create="false" edit="false" delete="false">
+                <sheet>
+                    <div class="alert alert-success" role="alert" invisible="not query_success or acb_status not in ('COMPLETED', 'SUCCESS')">
+                        <strong>Payment Completed</strong>
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="not query_success or acb_status not in ('INIT', 'PENDING')">
+                        <strong>Payment Pending</strong>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="not query_success or acb_status not in ('CANCELLED', 'ERRORCORRECTED')">
+                        <strong>Payment Cancelled</strong>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="query_success">
+                        <strong>Query Failed:</strong> <field name="error_message" nolabel="1"/>
+                    </div>
+
+                    <group invisible="not query_success">
+                        <group string="Transaction Info">
+                            <field name="transaction_name" string="Transaction ID"/>
+                            <field name="acb_status" string="Status"/>
+                            <field name="acb_amount" string="Amount"/>
+                        </group>
+                        <group string="ACB Details">
+                            <field name="acb_trace_number"/>
+                            <field name="acb_order_id"/>
+                            <field name="acb_virtual_account" string="Virtual Account"/>
+                            <field name="acb_merchant_id"/>
+                            <field name="acb_terminal_id"/>
+                            <field name="acb_beneficiary_name" string="Beneficiary Name"/>
+                        </group>
+                    </group>
+
+                    <notebook invisible="not query_success">
+                        <page string="Raw JSON" name="raw_json">
+                            <field name="raw_response" nolabel="1" readonly="1" widget="text"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <footer>
+                    <button string="Close" class="btn-primary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ACB Cancel QR Result Popup -->
+    <record id="view_acb_cancel_wizard_form" model="ir.ui.view">
+        <field name="name">isd_payment.acb_cancel_wizard.form</field>
+        <field name="model">isd_payment.acb_cancel_wizard</field>
+        <field name="arch" type="xml">
+            <form string="Cancel QR Result" create="false" edit="false" delete="false">
+                <sheet>
+                    <div class="alert alert-success" role="alert" invisible="not cancel_success">
+                        <strong>QR Code has been cancelled successfully.</strong>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="cancel_success">
+                        <strong>Cancel Failed:</strong> <field name="error_message" nolabel="1"/>
+                    </div>
+
+                    <group invisible="not cancel_success">
+                        <group>
+                            <field name="transaction_name" string="Transaction ID"/>
+                            <field name="acb_status" string="Status"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Raw JSON" name="raw_json">
+                            <field name="raw_response" nolabel="1" readonly="1" widget="text"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <footer>
+                    <button string="Close" class="btn-primary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ACB Cancel Confirmation Wizard -->
+    <record id="view_acb_cancel_confirm_form" model="ir.ui.view">
+        <field name="name">isd_payment.acb_cancel_confirm.form</field>
+        <field name="model">isd_payment.acb_cancel_confirm</field>
+        <field name="arch" type="xml">
+            <form string="Cancel QR Code" create="false" edit="false" delete="false">
+                <sheet>
+                    <div class="alert alert-warning" role="alert">
+                        <strong>Are you sure you want to cancel this QR Code?</strong>
+                        <p>This action cannot be undone. The QR code will be invalidated on ACB's system.</p>
+                    </div>
+                    <group>
+                        <field name="transaction_id" invisible="1"/>
+                        <field name="transaction_name" string="Transaction ID"/>
+                        <field name="amount" string="Amount"/>
+                        <field name="acb_trace_number"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm_cancel" string="Confirm Cancel" type="object" class="btn-danger"/>
+                    <button string="Go Back" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

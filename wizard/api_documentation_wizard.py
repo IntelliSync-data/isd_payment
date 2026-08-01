@@ -88,6 +88,10 @@ class ApiDocumentationWizard(models.TransientModel):
                 wizard.api_documentation = self._generate_vtcpay_docs(method, base_url)
                 continue
 
+            if method.payment_provider == 'acbpay':
+                wizard.api_documentation = self._generate_acbpay_docs(method, base_url)
+                continue
+
             html = f'''
             <div class="api-documentation">
                 <style>
@@ -101,21 +105,16 @@ class ApiDocumentationWizard(models.TransientModel):
                         padding: 15px;
                         margin: 20px 0;
                     }}
-                    .api-endpoint {{
-                        background: #28a745;
-                        color: white;
-                        padding: 5px 10px;
-                        border-radius: 3px;
-                        display: inline-block;
-                        margin-right: 10px;
-                        font-weight: bold;
+                    .api-method {{
+                        color: white; padding: 4px 12px; border-radius: 4px;
+                        display: inline-block; margin-right: 8px; font-weight: bold;
+                        font-size: 13px; letter-spacing: 0.5px; vertical-align: middle;
                     }}
+                    .api-method-post {{ background: #49cc90; }}
+                    .api-method-get {{ background: #61affe; }}
                     .api-url {{
-                        background: #e9ecef;
-                        padding: 5px 10px;
-                        border-radius: 3px;
-                        display: inline-block;
-                        font-family: monospace;
+                        background: #e9ecef; padding: 4px 12px; border-radius: 4px;
+                        display: inline-block; font-family: monospace; vertical-align: middle;
                     }}
                     .code-block {{
                         background: #2d2d2d;
@@ -156,30 +155,39 @@ class ApiDocumentationWizard(models.TransientModel):
                 <div class="api-section">
                     <h3>1. Create Payment (Generate QR)</h3>
                     <p>
-                        <span class="api-endpoint">POST</span>
+                        <span class="api-method api-method-post">POST</span>
                         <span class="api-url">{base_url}/create</span>
                     </p>
                     <p class="api-description">Create a payment transaction and generate QR code URL</p>
 
-                    <h4>Request Body:</h4>
+                    <h4>Request Body (JSON-RPC):</h4>
                     <div class="code-block">
                         <pre>{{
-  "amount": 50000,
-  "description": "Order #12345"  // Optional
+  "jsonrpc": "2.0",
+  "method": "call",
+  "params": {{
+    "amount": 50000,
+    "description": "Order #12345",
+    "branch": "Chi nhanh 1"
+  }}
 }}</pre>
                     </div>
 
                     <h4>Response (Success):</h4>
                     <div class="code-block">
                         <pre>{{
-  "success": true,
-  "data": {{
-    "transaction_id": "{method.prefix}ABC123XYZ",
-    "qr_url": "https://qr.sepay.vn/img?acc=...",
-    "amount": 50000,
-    "bank_account": "{method.provider_account_id}",
-    "bank_code": "{method.sepay_acc_bank}",
-    "created_at": "2026-04-04 10:30:00"
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {{
+    "success": true,
+    "data": {{
+      "transaction_id": "{method.prefix}ABC123XYZ",
+      "qr_url": "https://qr.sepay.vn/img?acc=...",
+      "amount": 50000,
+      "bank_account": "{method.provider_account_id}",
+      "bank_code": "{method.sepay_acc_bank}",
+      "created_at": "2026-04-04 10:30:00"
+    }}
   }}
 }}</pre>
                     </div>
@@ -188,7 +196,7 @@ class ApiDocumentationWizard(models.TransientModel):
                     <div class="code-block">
                         <pre>curl -X POST {base_url}/create \\
   -H "Content-Type: application/json" \\
-  -d '{{"amount": 50000, "description": "Test"}}'</pre>
+  -d '{{"jsonrpc": "2.0", "method": "call", "params": {{"amount": 50000, "description": "Test", "branch": "Chi nhanh 1"}}}}'</pre>
                     </div>
 
                     <h4>Python Example:</h4>
@@ -197,10 +205,14 @@ class ApiDocumentationWizard(models.TransientModel):
 
 response = requests.post(
     '{base_url}/create',
-    json={{'amount': 50000, 'description': 'Test'}}
+    json={{
+        'jsonrpc': '2.0',
+        'method': 'call',
+        'params': {{'amount': 50000, 'description': 'Test', 'branch': 'Chi nhanh 1'}}
+    }}
 )
 data = response.json()
-print(data['data']['qr_url'])</pre>
+print(data['result']['data']['qr_url'])</pre>
                     </div>
 
                     <h4>JavaScript Example:</h4>
@@ -208,10 +220,13 @@ print(data['data']['qr_url'])</pre>
                         <pre>fetch('{base_url}/create', {{
   method: 'POST',
   headers: {{'Content-Type': 'application/json'}},
-  body: JSON.stringify({{amount: 50000, description: 'Test'}})
+  body: JSON.stringify({{
+    jsonrpc: '2.0', method: 'call',
+    params: {{amount: 50000, description: 'Test', branch: 'Chi nhanh 1'}}
+  }})
 }})
 .then(res => res.json())
-.then(data => console.log(data.data.qr_url))</pre>
+.then(data => console.log(data.result.data.qr_url))</pre>
                     </div>
                 </div>
 
@@ -219,31 +234,39 @@ print(data['data']['qr_url'])</pre>
                 <div class="api-section">
                     <h3>2. Confirm Payment</h3>
                     <p>
-                        <span class="api-endpoint">POST</span>
+                        <span class="api-method api-method-post">POST</span>
                         <span class="api-url">{base_url}/confirm</span>
                     </p>
                     <p class="api-description">Check if payment has been confirmed via SePay</p>
 
-                    <h4>Request Body:</h4>
+                    <h4>Request Body (JSON-RPC):</h4>
                     <div class="code-block">
                         <pre>{{
-  "transaction_id": "{method.prefix}ABC123XYZ",
-  "amount": 50000
+  "jsonrpc": "2.0",
+  "method": "call",
+  "params": {{
+    "transaction_id": "{method.prefix}ABC123XYZ",
+    "amount": 50000
+  }}
 }}</pre>
                     </div>
 
                     <h4>Response (Confirmed):</h4>
                     <div class="code-block">
                         <pre>{{
-  "success": true,
-  "status": "confirmed",
-  "message": "Payment confirmed via SePay",
-  "data": {{
-    "transaction_id": "{method.prefix}ABC123XYZ",
-    "amount": 50000,
-    "confirmed_at": "2026-04-04 10:35:00",
-    "sepay_transaction_id": "SP123456789",
-    "sepay_reference": "REF987654"
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {{
+    "success": true,
+    "status": "confirmed",
+    "message": "Payment confirmed via SePay",
+    "data": {{
+      "transaction_id": "{method.prefix}ABC123XYZ",
+      "amount": 50000,
+      "confirmed_at": "2026-04-04 10:35:00",
+      "sepay_transaction_id": "SP123456789",
+      "sepay_reference": "REF987654"
+    }}
   }}
 }}</pre>
                     </div>
@@ -251,9 +274,13 @@ print(data['data']['qr_url'])</pre>
                     <h4>Response (Processing):</h4>
                     <div class="code-block">
                         <pre>{{
-  "success": true,
-  "status": "processing",
-  "message": "Payment is being processed"
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {{
+    "success": true,
+    "status": "processing",
+    "message": "Payment is being processed"
+  }}
 }}</pre>
                     </div>
 
@@ -261,7 +288,7 @@ print(data['data']['qr_url'])</pre>
                     <div class="code-block">
                         <pre>curl -X POST {base_url}/confirm \\
   -H "Content-Type: application/json" \\
-  -d '{{"transaction_id": "{method.prefix}ABC123", "amount": 50000}}'</pre>
+  -d '{{"jsonrpc": "2.0", "method": "call", "params": {{"transaction_id": "{method.prefix}ABC123", "amount": 50000}}}}'</pre>
                     </div>
                 </div>
 
@@ -269,7 +296,7 @@ print(data['data']['qr_url'])</pre>
                 <div class="api-section">
                     <h3>3. Get Transaction Status</h3>
                     <p>
-                        <span class="api-endpoint">GET</span>
+                        <span class="api-method api-method-get">GET</span>
                         <span class="api-url">{base_url}/transaction/{{transaction_id}}</span>
                     </p>
                     <p class="api-description">Get status and details of a specific transaction</p>
@@ -300,7 +327,7 @@ print(data['data']['qr_url'])</pre>
                 <div class="api-section">
                     <h3>4. List Transactions</h3>
                     <p>
-                        <span class="api-endpoint">GET</span>
+                        <span class="api-method api-method-get">GET</span>
                         <span class="api-url">{base_url}/transactions</span>
                     </p>
                     <p class="api-description">Get list of transactions with pagination and filters</p>
@@ -389,7 +416,9 @@ print(data['data']['qr_url'])</pre>
             <style>
                 .api-documentation {{ font-family: 'Courier New', monospace; font-size: 13px; }}
                 .api-section {{ background: #f8f9fa; border-left: 4px solid #e74c3c; padding: 15px; margin: 20px 0; }}
-                .api-endpoint {{ background: #28a745; color: white; padding: 5px 10px; border-radius: 3px; display: inline-block; margin-right: 10px; font-weight: bold; }}
+                .api-method {{ color: white; padding: 4px 12px; border-radius: 4px; display: inline-block; margin-right: 8px; font-weight: bold; font-size: 13px; letter-spacing: 0.5px; vertical-align: middle; }}
+                .api-method-post {{ background: #49cc90; }}
+                .api-method-get {{ background: #61affe; }}
                 .api-url {{ background: #e9ecef; padding: 5px 10px; border-radius: 3px; display: inline-block; font-family: monospace; }}
                 .code-block {{ background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow-x: auto; margin: 10px 0; }}
                 .code-block pre {{ margin: 0; white-space: pre-wrap; }}
@@ -422,42 +451,55 @@ print(data['data']['qr_url'])</pre>
             <!-- API 1: Create Payment -->
             <div class="api-section">
                 <h3>1. Create Payment (Get VTC Pay Redirect URL)</h3>
-                <p><span class="api-endpoint">POST</span><span class="api-url">{base_url}/create</span></p>
+                <p><span class="api-method api-method-post">POST</span><span class="api-url">{base_url}/create</span></p>
                 <p class="api-description">Create a VTC Pay order. Returns a redirect URL for user to complete payment.</p>
 
-                <h4>Request Body:</h4>
+                <h4>Request Body (JSON-RPC):</h4>
                 <div class="code-block"><pre>{{
-  "amount": 500,
-  "description": "Order #12345"
+  "jsonrpc": "2.0",
+  "method": "call",
+  "params": {{
+    "amount": 500,
+    "description": "Order #12345",
+    "branch": "Phan Thiet - May 1"
+  }}
 }}</pre></div>
 
-                <h4>Response (Success):</h4>
+                <h4>Response:</h4>
                 <div class="code-block"><pre>{{
-  "success": true,
-  "data": {{
-    "transaction_id": "uuid-generated-id",
-    "redirect_url": "https://vtcpay.vn/checkout.html?...",
-    "amount": 500,
-    "created_at": "2026-04-04 10:30:00"
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {{
+    "success": true,
+    "data": {{
+      "transaction_id": "uuid-generated-id",
+      "redirect_url": "https://vtcpay.vn/checkout.html?...",
+      "amount": 500,
+      "created_at": "2026-04-04 10:30:00"
+    }}
   }}
 }}</pre></div>
 
                 <h4>cURL Example:</h4>
                 <div class="code-block"><pre>curl -X POST {base_url}/create \\
   -H "Content-Type: application/json" \\
-  -d '{{"amount": 500, "description": "Test"}}'</pre></div>
+  -d '{{"jsonrpc": "2.0", "method": "call", "params": {{"amount": 500, "description": "Test", "branch": "Chi nhanh 1"}}}}'</pre></div>
             </div>
 
             <!-- API 2: Confirm Payment -->
             <div class="api-section">
                 <h3>2. Confirm Payment (Poll VTC Pay Status)</h3>
-                <p><span class="api-endpoint">POST</span><span class="api-url">{base_url}/confirm</span></p>
+                <p><span class="api-method api-method-post">POST</span><span class="api-url">{base_url}/confirm</span></p>
                 <p class="api-description">Check VTC Pay order status via their API.</p>
 
-                <h4>Request Body:</h4>
+                <h4>Request Body (JSON-RPC):</h4>
                 <div class="code-block"><pre>{{
-  "transaction_id": "uuid-generated-id",
-  "amount": 500
+  "jsonrpc": "2.0",
+  "method": "call",
+  "params": {{
+    "transaction_id": "uuid-generated-id",
+    "amount": 500
+  }}
 }}</pre></div>
 
                 <h4>Response (Confirmed):</h4>
@@ -476,7 +518,7 @@ print(data['data']['qr_url'])</pre>
             <!-- API 3: Get Transaction -->
             <div class="api-section">
                 <h3>3. Get Transaction Status</h3>
-                <p><span class="api-endpoint">GET</span><span class="api-url">{base_url}/transaction/{{transaction_id}}</span></p>
+                <p><span class="api-method api-method-get">GET</span><span class="api-url">{base_url}/transaction/{{transaction_id}}</span></p>
                 <div class="code-block"><pre>curl -X GET {base_url}/transaction/YOUR_TRANSACTION_ID</pre></div>
             </div>
 
@@ -503,7 +545,9 @@ print(data['data']['qr_url'])</pre>
             <style>
                 .api-documentation {{ font-family: 'Courier New', monospace; font-size: 13px; }}
                 .api-section {{ background: #f8f9fa; border-left: 4px solid #003087; padding: 15px; margin: 20px 0; }}
-                .api-endpoint {{ background: #28a745; color: white; padding: 5px 10px; border-radius: 3px; display: inline-block; margin-right: 10px; font-weight: bold; }}
+                .api-method {{ color: white; padding: 4px 12px; border-radius: 4px; display: inline-block; margin-right: 8px; font-weight: bold; font-size: 13px; letter-spacing: 0.5px; vertical-align: middle; }}
+                .api-method-post {{ background: #49cc90; }}
+                .api-method-get {{ background: #61affe; }}
                 .api-url {{ background: #e9ecef; padding: 5px 10px; border-radius: 3px; display: inline-block; font-family: monospace; }}
                 .code-block {{ background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow-x: auto; margin: 10px 0; }}
                 .code-block pre {{ margin: 0; white-space: pre-wrap; }}
@@ -536,81 +580,100 @@ print(data['data']['qr_url'])</pre>
             <!-- API 1: Create Payment -->
             <div class="api-section">
                 <h3>1. Create Payment (Get PayPal Redirect URL)</h3>
-                <p><span class="api-endpoint">POST</span><span class="api-url">{base_url}/create</span></p>
+                <p><span class="api-method api-method-post">POST</span><span class="api-url">{base_url}/create</span></p>
                 <p class="api-description">Create a PayPal order. Returns a redirect URL for user approval.</p>
 
-                <h4>Request Body:</h4>
+                <h4>Request Body (JSON-RPC):</h4>
                 <div class="code-block"><pre>{{
-  "amount": 500000,
-  "description": "Order #12345"
+  "jsonrpc": "2.0",
+  "method": "call",
+  "params": {{
+    "amount": 500000,
+    "description": "Order #12345",
+    "branch": "Phan Thiet - May 1"
+  }}
 }}</pre></div>
 
-                <h4>Response (Success):</h4>
+                <h4>Response:</h4>
                 <div class="code-block"><pre>{{
-  "success": true,
-  "data": {{
-    "transaction_id": "PAYPAL_ORDER_ID_HERE",
-    "redirect_url": "https://www.sandbox.paypal.com/checkoutnow?token=...",
-    "amount": 500000,
-    "amount_usd": 19.01,
-    "created_at": "2026-04-04 10:30:00"
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {{
+    "success": true,
+    "data": {{
+      "transaction_id": "PAYPAL_ORDER_ID_HERE",
+      "redirect_url": "https://www.sandbox.paypal.com/checkoutnow?token=...",
+      "amount": 500000,
+      "amount_usd": 19.01,
+      "created_at": "2026-04-04 10:30:00"
+    }}
   }}
 }}</pre></div>
 
                 <h4>cURL Example:</h4>
                 <div class="code-block"><pre>curl -X POST {base_url}/create \\
   -H "Content-Type: application/json" \\
-  -d '{{"amount": 500000, "description": "Test"}}'</pre></div>
+  -d '{{"jsonrpc": "2.0", "method": "call", "params": {{"amount": 500000, "description": "Test", "branch": "Chi nhanh 1"}}}}'</pre></div>
 
                 <h4>JavaScript Example:</h4>
                 <div class="code-block"><pre>const res = await fetch('{base_url}/create', {{
   method: 'POST',
   headers: {{'Content-Type': 'application/json'}},
-  body: JSON.stringify({{amount: 500000}})
+  body: JSON.stringify({{
+    jsonrpc: '2.0', method: 'call',
+    params: {{amount: 500000, branch: 'Chi nhanh 1'}}
+  }})
 }});
 const data = await res.json();
-// Redirect user to PayPal
-window.location.href = data.data.redirect_url;</pre></div>
+window.location.href = data.result.data.redirect_url;</pre></div>
             </div>
 
             <!-- API 2: Confirm Payment -->
             <div class="api-section">
                 <h3>2. Confirm Payment (Capture PayPal Order)</h3>
-                <p><span class="api-endpoint">POST</span><span class="api-url">{base_url}/confirm</span></p>
+                <p><span class="api-method api-method-post">POST</span><span class="api-url">{base_url}/confirm</span></p>
                 <p class="api-description">Capture the PayPal order after user approves. Call this after the user returns from PayPal.</p>
 
-                <h4>Request Body:</h4>
+                <h4>Request Body (JSON-RPC):</h4>
                 <div class="code-block"><pre>{{
-  "transaction_id": "PAYPAL_ORDER_ID_HERE",
-  "amount": 500000
+  "jsonrpc": "2.0",
+  "method": "call",
+  "params": {{
+    "transaction_id": "PAYPAL_ORDER_ID_HERE",
+    "amount": 500000
+  }}
 }}</pre></div>
 
                 <h4>Response (Confirmed):</h4>
                 <div class="code-block"><pre>{{
-  "success": true,
-  "status": "confirmed",
-  "message": "Payment confirmed via PayPal",
-  "data": {{
-    "transaction_id": "PAYPAL_ORDER_ID_HERE",
-    "amount": 500000,
-    "amount_usd": 19.01,
-    "confirmed_at": "2026-04-04 10:35:00",
-    "paypal_order_id": "PAYPAL_ORDER_ID_HERE",
-    "paypal_capture_id": "CAPTURE_ID",
-    "paypal_payer_email": "buyer@example.com"
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {{
+    "success": true,
+    "status": "confirmed",
+    "message": "Payment confirmed via PayPal",
+    "data": {{
+      "transaction_id": "PAYPAL_ORDER_ID_HERE",
+      "amount": 500000,
+      "amount_usd": 19.01,
+      "confirmed_at": "2026-04-04 10:35:00",
+      "paypal_order_id": "PAYPAL_ORDER_ID_HERE",
+      "paypal_capture_id": "CAPTURE_ID",
+      "paypal_payer_email": "buyer@example.com"
+    }}
   }}
 }}</pre></div>
 
                 <h4>cURL Example:</h4>
                 <div class="code-block"><pre>curl -X POST {base_url}/confirm \\
   -H "Content-Type: application/json" \\
-  -d '{{"transaction_id": "ORDER_ID", "amount": 500000}}'</pre></div>
+  -d '{{"jsonrpc": "2.0", "method": "call", "params": {{"transaction_id": "ORDER_ID", "amount": 500000}}}}'</pre></div>
             </div>
 
             <!-- API 3: Get Transaction -->
             <div class="api-section">
                 <h3>3. Get Transaction Status</h3>
-                <p><span class="api-endpoint">GET</span><span class="api-url">{base_url}/transaction/{{transaction_id}}</span></p>
+                <p><span class="api-method api-method-get">GET</span><span class="api-url">{base_url}/transaction/{{transaction_id}}</span></p>
                 <p class="api-description">Get current status of a transaction.</p>
 
                 <h4>Response:</h4>
@@ -638,6 +701,162 @@ window.location.href = data.data.redirect_url;</pre></div>
                     <li><code>CORS_BLOCKED</code>: Origin not allowed</li>
                     <li><code>INVALID_AMOUNT</code>: Amount validation failed</li>
                     <li><code>PAYPAL_ERROR</code>: PayPal API returned an error</li>
+                    <li><code>TRANSACTION_NOT_FOUND</code>: Transaction doesn't exist</li>
+                    <li><code>TRANSACTION_EXPIRED</code>: Transaction expired (&gt;1 hour)</li>
+                    <li><code>INTERNAL_ERROR</code>: Server error</li>
+                </ul>
+            </div>
+        </div>
+        '''
+
+    def _generate_acbpay_docs(self, method, base_url):
+        """Generate ACB Pay-specific API documentation"""
+        webhook_base = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+        return f'''
+        <div class="api-documentation">
+            <style>
+                .api-documentation {{ font-family: 'Courier New', monospace; font-size: 13px; }}
+                .api-section {{ background: #f8f9fa; border-left: 4px solid #d4272e; padding: 15px; margin: 20px 0; }}
+                .api-method {{
+                    color: white; padding: 4px 12px; border-radius: 4px;
+                    display: inline-block; margin-right: 8px; font-weight: bold;
+                    font-size: 13px; letter-spacing: 0.5px; vertical-align: middle;
+                }}
+                .api-method-post {{ background: #49cc90; }}
+                .api-method-get {{ background: #61affe; }}
+                .api-url {{
+                    background: #e9ecef; padding: 4px 12px; border-radius: 4px;
+                    display: inline-block; font-family: monospace; vertical-align: middle;
+                }}
+                .code-block {{ background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow-x: auto; margin: 10px 0; }}
+                .code-block pre {{ margin: 0; white-space: pre-wrap; }}
+                .api-description {{ color: #6c757d; margin: 10px 0; }}
+                h3 {{ color: #d4272e; border-bottom: 2px solid #d4272e; padding-bottom: 5px; }}
+                h4 {{ color: #e74c3c; margin-top: 15px; }}
+            </style>
+
+            <h2>API Documentation - {method.name} (ACB Pay)</h2>
+
+            <div style="background: #fdf2f2; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <p><b>Base URL:</b> <code>{base_url}</code></p>
+                <p><b>Provider:</b> ACB Pay (QR Code)</p>
+                <p><b>ACB Host:</b> {method.provider_host or 'N/A'}</p>
+                <p><b>CORS:</b> {{'Enabled' if method.enable_cors else 'Disabled (Public API)'}}</p>
+                <p><b>Note:</b> All API requests use JSON-RPC 2.0 format. Wrap your params inside <code>"params"</code>.</p>
+            </div>
+
+            <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h4>ACB Pay Payment Flow</h4>
+                <ol>
+                    <li>Call <b>/create</b> with amount → get <code>qr_url</code> and <code>transaction_id</code></li>
+                    <li>Display QR code to customer for scanning</li>
+                    <li>ACB sends realtime webhook when payment completes → auto-confirms</li>
+                    <li>Optionally call <b>/confirm</b> to poll status (backup for webhook)</li>
+                </ol>
+                <p><b>Webhook URLs (for ACB configuration):</b></p>
+                <ul>
+                    <li>Realtime: <code>{webhook_base}/acb_pay/webhook/realtime</code></li>
+                    <li>Daily (T-1): <code>{webhook_base}/acb_pay/webhook/daily</code></li>
+                </ul>
+            </div>
+
+            <!-- API 1: Create Payment -->
+            <div class="api-section">
+                <h3>1. Create Payment (Generate ACB QR Code)</h3>
+                <p>
+                    <span class="api-method api-method-post">POST</span>
+                    <span class="api-url">{base_url}/create</span>
+                </p>
+                <p class="api-description">Create a QR code via ACB One Connect API.</p>
+
+                <h4>Request Body (JSON-RPC):</h4>
+                <div class="code-block"><pre>{{
+  "jsonrpc": "2.0",
+  "method": "call",
+  "params": {{
+    "amount": 500000,
+    "description": "Order #12345",
+    "branch": "Phan Thiet - May 1"
+  }}
+}}</pre></div>
+
+                <h4>Response (Success):</h4>
+                <div class="code-block"><pre>{{
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {{
+    "success": true,
+    "data": {{
+      "transaction_id": "{method.prefix}ABC123XYZ",
+      "qr_url": "https://...",
+      "amount": 500000,
+      "created_at": "2026-07-25 10:30:00"
+    }}
+  }}
+}}</pre></div>
+
+                <h4>cURL Example:</h4>
+                <div class="code-block"><pre>curl -X POST {base_url}/create \\
+  -H "Content-Type: application/json" \\
+  -d '{{"jsonrpc": "2.0", "method": "call", "params": {{"amount": 500000, "description": "Test", "branch": "Chi nhanh 1"}}}}'</pre></div>
+            </div>
+
+            <!-- API 2: Confirm Payment -->
+            <div class="api-section">
+                <h3>2. Confirm Payment (Poll ACB Status)</h3>
+                <p>
+                    <span class="api-method api-method-post">POST</span>
+                    <span class="api-url">{base_url}/confirm</span>
+                </p>
+                <p class="api-description">Check payment status. Usually auto-confirmed by webhook, this is a backup.</p>
+
+                <h4>Request Body (JSON-RPC):</h4>
+                <div class="code-block"><pre>{{
+  "jsonrpc": "2.0",
+  "method": "call",
+  "params": {{
+    "transaction_id": "{method.prefix}ABC123XYZ",
+    "amount": 500000
+  }}
+}}</pre></div>
+
+                <h4>cURL Example:</h4>
+                <div class="code-block"><pre>curl -X POST {base_url}/confirm \\
+  -H "Content-Type: application/json" \\
+  -d '{{"jsonrpc": "2.0", "method": "call", "params": {{"transaction_id": "{method.prefix}ABC123", "amount": 500000}}}}'</pre></div>
+            </div>
+
+            <!-- Webhook -->
+            <div class="api-section">
+                <h3>3. Webhook (ACB → Server)</h3>
+                <p class="api-description">ACB calls these endpoints automatically. No action needed from integrator.</p>
+                <ul>
+                    <li><b>Realtime:</b> <code>{webhook_base}/acb_pay/webhook/realtime</code></li>
+                    <li><b>Daily:</b> <code>{webhook_base}/acb_pay/webhook/daily</code></li>
+                </ul>
+                <p>Security: Verified by <code>x-api-key</code> header + IP whitelist ({method.acb_webhook_ip or 'N/A'})</p>
+            </div>
+
+            <!-- API 3: Get Transaction -->
+            <div class="api-section">
+                <h3>4. Get Transaction Status</h3>
+                <p>
+                    <span class="api-method api-method-get">GET</span>
+                    <span class="api-url">{base_url}/transaction/{{transaction_id}}</span>
+                </p>
+                <div class="code-block"><pre>curl -X POST {base_url}/transaction/{method.prefix}ABC123 \\
+  -H "Content-Type: application/json" \\
+  -d '{{"jsonrpc": "2.0", "method": "call", "params": {{}}}}'</pre></div>
+            </div>
+
+            <!-- Error Codes -->
+            <div class="api-section">
+                <h3>Error Codes</h3>
+                <ul>
+                    <li><code>METHOD_NOT_FOUND</code>: Payment method not found or inactive</li>
+                    <li><code>CORS_BLOCKED</code>: Origin not allowed</li>
+                    <li><code>INVALID_AMOUNT</code>: Amount validation failed</li>
+                    <li><code>ACBPAY_ERROR</code>: ACB API returned an error</li>
                     <li><code>TRANSACTION_NOT_FOUND</code>: Transaction doesn't exist</li>
                     <li><code>TRANSACTION_EXPIRED</code>: Transaction expired (&gt;1 hour)</li>
                     <li><code>INTERNAL_ERROR</code>: Server error</li>

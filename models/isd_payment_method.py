@@ -37,7 +37,7 @@ class IsdPaymentMethod(models.Model):
 
     # Provider
     payment_provider = fields.Selection(
-        [('sepay', 'SePay'), ('paypal', 'PayPal'), ('vtcpay', 'VTC Pay')],
+        [('sepay', 'SePay'), ('paypal', 'PayPal'), ('vtcpay', 'VTC Pay'), ('acbpay', 'ACB Pay')],
         string='Payment Provider',
         required=True,
         default='sepay',
@@ -87,6 +87,49 @@ class IsdPaymentMethod(models.Model):
     vtc_receiver_account = fields.Char(
         string='Receiver Account',
         help='VTC Pay receiver account number'
+    )
+
+    # ACB Pay-specific Configuration
+    acb_api_key = fields.Char(
+        string='API Key',
+        help='ACB webhook x-api-key for verifying callbacks'
+    )
+    acb_webhook_ip = fields.Char(
+        string='Webhook IP Whitelist',
+        default='124.197.28.244',
+        help='Comma-separated IPs allowed to call webhook (ACB server IPs)'
+    )
+    acb_owner_number = fields.Char(
+        string='Owner Number',
+        help='X-Owner-Number header value (from ACB data test)'
+    )
+    acb_provider_id = fields.Char(
+        string='Provider ID',
+        help='X-Provider-ID header value (from ACB data test)'
+    )
+    acb_virtual_account_prefix = fields.Char(
+        string='Virtual Account Prefix',
+        help='Prefix for virtual account (from ACB data test)'
+    )
+    acb_beneficiary_name = fields.Char(
+        string='Beneficiary Name',
+        help='Account holder name displayed on QR code'
+    )
+    acb_account_number = fields.Char(
+        string='Account Number',
+        help='ACB bank account number (e.g. 5798589)'
+    )
+    acb_merchant_id = fields.Char(
+        string='Merchant ID',
+        help='Merchant ID from ACB, max 30 chars'
+    )
+    acb_terminal_id = fields.Char(
+        string='Terminal ID',
+        help='Terminal ID from ACB, max 30 chars'
+    )
+    acb_user_id = fields.Char(
+        string='User ID',
+        help='ACB user ID (userId) for QR payment API'
     )
 
     # PayPal-specific Configuration
@@ -154,7 +197,9 @@ class IsdPaymentMethod(models.Model):
 
     @api.depends('payment_provider', 'provider_host', 'provider_account_id', 'provider_secret',
                  'sepay_qr_host', 'sepay_acc_bank',
-                 'vtc_security_code', 'vtc_receiver_account')
+                 'vtc_security_code', 'vtc_receiver_account',
+                 'acb_owner_number', 'acb_provider_id', 'acb_virtual_account_prefix', 'acb_beneficiary_name',
+                 'acb_account_number', 'acb_merchant_id', 'acb_terminal_id')
     def _compute_is_configured(self):
         for record in self:
             if record.payment_provider == 'paypal':
@@ -169,6 +214,19 @@ class IsdPaymentMethod(models.Model):
                     record.provider_account_id,
                     record.vtc_security_code,
                     record.vtc_receiver_account,
+                ])
+            elif record.payment_provider == 'acbpay':
+                record.is_configured = all([
+                    record.provider_host,
+                    record.provider_account_id,
+                    record.provider_secret,
+                    record.acb_owner_number,
+                    record.acb_provider_id,
+                    record.acb_virtual_account_prefix,
+                    record.acb_beneficiary_name,
+                    record.acb_account_number,
+                    record.acb_merchant_id,
+                    record.acb_terminal_id,
                 ])
             else:  # sepay
                 record.is_configured = all([

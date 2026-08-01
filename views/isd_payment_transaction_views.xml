@@ -22,6 +22,7 @@
                             <field name="amount" widget="monetary" options="{'currency_field': 'currency_id'}"/>
                             <field name="currency_id" invisible="1"/>
                             <field name="description"/>
+                            <field name="branch"/>
                         </group>
                         <group>
                             <field name="create_date" string="Created At"/>
@@ -35,13 +36,8 @@
                         <page string="Payment Info" name="payment_info">
                             <group>
                                 <group string="QR Code">
-                                    <field name="qr_url" widget="url"/>
-                                    <label for="qr_url" string="QR Code Image" invisible="not qr_url"/>
-                                    <div invisible="not qr_url">
-                                        <a href="#" class="btn btn-primary" onclick="window.open(document.querySelector('[name=qr_url]').value, '_blank'); return false;">
-                                            Open QR Code
-                                        </a>
-                                    </div>
+                                    <field name="qr_image_preview" nolabel="1" invisible="not qr_url" colspan="2"/>
+                                    <field name="qr_url" invisible="1"/>
                                 </group>
                                 <group string="Bank Details">
                                     <field name="bank_code"/>
@@ -59,6 +55,30 @@
                                 <group>
                                     <field name="sepay_transaction_content"/>
                                 </group>
+                            </group>
+                        </page>
+
+                        <page string="ACB Pay" name="acb_info" invisible="not acb_trace_number">
+                            <group>
+                                <group>
+                                    <field name="acb_trace_number"/>
+                                    <field name="acb_order_id"/>
+                                </group>
+                                <group>
+                                    <field name="acb_virtual_account"/>
+                                    <field name="acb_qr_data"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Reconciliation" name="reconciliation_info">
+                            <group>
+                                <group>
+                                    <field name="reconciliation_status" widget="badge" decoration-success="reconciliation_status == 'matched'" decoration-info="reconciliation_status == 'waiting'" decoration-warning="reconciliation_status in ('updated', 'bank_data')" decoration-danger="reconciliation_status == 'review'"/>
+                                </group>
+                            </group>
+                            <group string="Reconciliation Data (JSON)" invisible="reconciliation_status == 'waiting'">
+                                <field name="reconciliation_data" nolabel="1" widget="text"/>
                             </group>
                         </page>
 
@@ -81,15 +101,21 @@
         <field name="name">isd_payment.transaction.tree</field>
         <field name="model">isd_payment.transaction</field>
         <field name="arch" type="xml">
-            <list string="Transactions" create="false" delete="false" decoration-success="status == 'confirmed'" decoration-muted="status == 'expired'" decoration-danger="status == 'failed'">
+            <list string="Transactions" create="false" decoration-success="status == 'confirmed'" decoration-muted="status == 'expired'" decoration-danger="status in ('failed', 'cancelled')">
                 <field name="transaction_id"/>
                 <field name="payment_method_id"/>
+                <field name="branch"/>
                 <field name="amount" sum="Total Amount"/>
-                <field name="status" widget="badge" decoration-success="status == 'confirmed'" decoration-info="status in ('pending', 'processing')" decoration-danger="status == 'failed'" decoration-muted="status == 'expired'"/>
+                <field name="status" widget="badge" decoration-success="status == 'confirmed'" decoration-info="status in ('pending', 'processing')" decoration-danger="status in ('failed', 'cancelled')" decoration-muted="status == 'expired'"/>
                 <field name="create_date" string="Created"/>
                 <field name="confirmed_at"/>
                 <field name="expired_at"/>
                 <field name="request_origin"/>
+                <field name="reconciliation_status" widget="badge" decoration-success="reconciliation_status == 'matched'" decoration-info="reconciliation_status == 'waiting'" decoration-warning="reconciliation_status in ('updated', 'bank_data')" decoration-danger="reconciliation_status == 'review'"/>
+                <button name="action_view_reconciliation_data" type="object" icon="fa-cog" string="" invisible="reconciliation_status == 'waiting'" class="btn-link"/>
+                <button name="action_query_acb_status" type="object" icon="fa-bell" string="" invisible="not acb_trace_number" class="btn-link" title="Query ACB Status"/>
+                <button name="action_cancel_acb_qr" type="object" icon="fa-times-circle" string="" invisible="not acb_trace_number or status in ('confirmed', 'cancelled', 'expired')" class="btn-link text-danger" title="Cancel QR Code"/>
+                <field name="acb_trace_number" column_invisible="True"/>
                 <field name="currency_id" column_invisible="True"/>
             </list>
         </field>
@@ -103,6 +129,7 @@
             <search string="Transactions">
                 <field name="transaction_id" filter_domain="[('transaction_id','ilike',self)]"/>
                 <field name="payment_method_id"/>
+                <field name="branch" filter_domain="[('branch','ilike',self)]"/>
                 <field name="amount"/>
                 <separator/>
                 <filter string="Pending" name="status_pending" domain="[('status','=','pending')]"/>
@@ -116,7 +143,14 @@
                 <filter string="This Month" name="this_month" domain="[('create_date','&gt;=', (context_today() - relativedelta(months=1)))]"/>
                 <separator/>
                 <filter string="Has SePay Response" name="has_sepay_response" domain="[('sepay_transaction_id','!=',False)]"/>
+                <separator/>
+                <filter string="Waiting" name="recon_waiting" domain="[('reconciliation_status','=','waiting')]"/>
+                <filter string="Matched" name="recon_matched" domain="[('reconciliation_status','=','matched')]"/>
+                <filter string="Updated" name="recon_updated" domain="[('reconciliation_status','=','updated')]"/>
+                <filter string="Review" name="recon_review" domain="[('reconciliation_status','=','review')]"/>
+                <filter string="Data Bank" name="recon_bank" domain="[('reconciliation_status','=','bank_data')]"/>
                 <group expand="0" string="Group By">
+                    <filter string="Branch" name="group_branch" context="{'group_by':'branch'}"/>
                     <filter string="Payment Method" name="group_payment_method" context="{'group_by':'payment_method_id'}"/>
                     <filter string="Status" name="group_status" context="{'group_by':'status'}"/>
                     <filter string="Created Date" name="group_create_date" context="{'group_by':'create_date:day'}"/>
@@ -125,11 +159,37 @@
         </field>
     </record>
 
+    <!-- Transaction Pivot View -->
+    <record id="view_isd_payment_transaction_pivot" model="ir.ui.view">
+        <field name="name">isd_payment.transaction.pivot</field>
+        <field name="model">isd_payment.transaction</field>
+        <field name="arch" type="xml">
+            <pivot string="Transaction Statistics" sample="1">
+                <field name="create_date" type="row" interval="day"/>
+                <field name="status" type="col"/>
+                <field name="amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Transaction Graph View -->
+    <record id="view_isd_payment_transaction_graph" model="ir.ui.view">
+        <field name="name">isd_payment.transaction.graph</field>
+        <field name="model">isd_payment.transaction</field>
+        <field name="arch" type="xml">
+            <graph string="Transaction Chart" type="bar" sample="1">
+                <field name="create_date" interval="day"/>
+                <field name="amount" type="measure"/>
+                <field name="status" type="col"/>
+            </graph>
+        </field>
+    </record>
+
     <!-- Transaction Action -->
     <record id="action_isd_payment_transaction" model="ir.actions.act_window">
         <field name="name">Transactions</field>
         <field name="res_model">isd_payment.transaction</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,form,pivot,graph</field>
         <field name="context">{'search_default_today': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_empty_folder">
@@ -138,6 +198,28 @@
             <p>
                 Transactions are created automatically via API calls.
             </p>
+        </field>
+    </record>
+
+    <!-- Reconciliation Data Popup -->
+    <record id="view_isd_payment_transaction_recon_popup" model="ir.ui.view">
+        <field name="name">isd_payment.transaction.recon.popup</field>
+        <field name="model">isd_payment.transaction</field>
+        <field name="arch" type="xml">
+            <form string="Reconciliation Data" create="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <field name="transaction_id" readonly="1"/>
+                        <field name="status" readonly="1"/>
+                        <field name="reconciliation_status" widget="badge" readonly="1" decoration-success="reconciliation_status == 'matched'" decoration-warning="reconciliation_status in ('updated', 'bank_data')" decoration-danger="reconciliation_status == 'review'"/>
+                    </group>
+                    <separator string="JSON Data from ACB"/>
+                    <field name="reconciliation_data" nolabel="1" readonly="1" widget="text"/>
+                </sheet>
+                <footer>
+                    <button string="Close" class="btn-primary" special="cancel"/>
+                </footer>
+            </form>
         </field>
     </record>
 

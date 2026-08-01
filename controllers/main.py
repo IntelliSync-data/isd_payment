@@ -5,6 +5,7 @@ from odoo.http import request, Response
 import json
 import logging
 import requests
+import re
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
@@ -333,11 +334,481 @@ class IsdPaymentController(http.Controller):
         return f"{token_type} {access_token}"
 
     # ==========================================
+    # ACB Pay Methods
+    # ==========================================
+
+    def _get_acb_token(self, payment_method):
+        """Get ACB Bearer token via OAuth2 client_credentials"""
+        token_url = f"{payment_method.provider_host}/acb/open/iam/id/v1/auth/realms/soba/protocol/openid-connect/token"
+        import base64
+        auth_str = base64.b64encode(
+            f"{payment_method.provider_account_id}:{payment_method.provider_secret}".encode()
+        ).decode()
+
+        response = requests.post(
+            token_url,
+            headers={
+                'Authorization': f'Basic {auth_str}',
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            data={
+                'client_id': payment_method.provider_account_id,
+                'client_secret': payment_method.provider_secret,
+                'grant_type': 'client_credentials',
+                'scope': 'soba-api',
+            },
+            timeout=30
+        )
+        if response.status_code not in (200, 201):
+            raise Exception(f"Could not get ACB token: {response.status_code} - {response.text}")
+        _logger.info(f"ACB token HTTP status: {response.status_code}")
+        data = response.json()
+        access_token = data.get('access_token', '')
+        if not access_token:
+            _logger.error(f"ACB token response (no access_token): {json.dumps(data)[:500]}")
+            raise Exception("ACB token is empty")
+        _logger.info(f"ACB token OK: token_type={data.get('token_type')}, expires_in={data.get('expires_in')}, scope={data.get('scope')}, token_preview={access_token[:20]}...")
+        return f"Bearer {access_token}"
+
+    def _create_acbpay_payment(self, payment_method, amount, transaction_id, description=''):
+        """Create ACB Pay QR Code via API"""
+        try:
+            import uuid
+
+            token = self._get_acb_token(payment_method)
+            request_id = str(uuid.uuid4())
+            trace_number = str(uuid.uuid4())
+            # orderId max 13 characters per ACB spec
+            order_id = transaction_id[:13] if len(transaction_id) > 13 else transaction_id
+
+            url = f"{payment_method.provider_host}/acb/open/payments/qr-payment/v1/initiate"
+            headers = {
+                'Authorization': token,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Client-ID': payment_method.provider_account_id,
+                'X-Owner-Number': payment_method.acb_owner_number,
+                'X-Request-ID': request_id,
+                'X-Service': 'QRPAYMENT',
+                'X-Owner-Type': 'ORG',
+                'X-Provider-ID': payment_method.acb_provider_id,
+            }
+            body = {
+                'requestTrace': request_id,
+                'requestDateTime': datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000+0700'),
+                'requestParameters': {
+                    'traceNumber': trace_number,
+                    'merchantId': payment_method.acb_merchant_id,
+                    'terminalId': payment_method.acb_terminal_id,
+                    'userId': payment_method.acb_user_id or '',
+                    'orderId': order_id,
+                    'virtualAccountPrefix': payment_method.acb_virtual_account_prefix,
+                    'beneficiaryName': payment_method.acb_beneficiary_name,
+                    'amount': int(amount),
+                    'description': re.sub(r'[^a-zA-Z0-9\s]', '', description or f'Payment {order_id}'),
+                    'additionalInfo': [
+                        {'key': 'key', 'value': 'value'}
+                    ],
+                },
+            }
+
+            _logger.info(f"ACB create QR request: URL={url}, headers={json.dumps({k:v for k,v in headers.items() if k != 'Authorization'})}, body={json.dumps(body)}")
+            response = requests.post(url, headers=headers, json=body, timeout=30)
+
+            if response.status_code not in (200, 201):
+                error_detail = response.text[:500] if response.text else 'No response body'
+                _logger.error(f"ACB create QR error: {response.status_code} {error_detail}")
+                return {'found': False, 'message': f'ACB API error: {response.status_code} - {error_detail}'}
+
+            data = response.json()
+
+            # ACB returns data in responseBody
+            response_body = data.get('responseBody', data.get('data', {}))
+            qr_url = response_body.get('qrDataUrl', '')
+            virtual_account = response_body.get('virtualAccount', '')
+            acb_trace = response_body.get('traceNumber', trace_number)
+
+            return {
+                'found': True,
+                'trace_number': acb_trace,
+                'order_id': order_id,
+                'qr_url': qr_url,
+                'qr_data': json.dumps(response_body) if response_body else '',
+                'virtual_account': virtual_account,
+            }
+        except requests.Timeout:
+            return {'found': False, 'message': 'ACB API timeout'}
+        except Exception as e:
+            _logger.exception("Error creating ACB Pay QR")
+            return {'found': False, 'message': str(e)}
+
+    def _check_acbpay_transaction(self, payment_method, transaction_id, amount):
+        """Check ACB Pay transaction via query API"""
+        try:
+            import uuid
+
+            token = self._get_acb_token(payment_method)
+            request_id = str(uuid.uuid4())
+
+            url = f"{payment_method.provider_host}/acb/open/payments/qr-payment/v1/transactions"
+            headers = {
+                'Authorization': token,
+                'Accept': 'application/json',
+                'X-Client-ID': payment_method.provider_account_id,
+                'X-Owner-Number': payment_method.acb_owner_number,
+                'X-Request-ID': request_id,
+                'X-Service': 'QRPAYMENT',
+                'X-Owner-Type': 'ORG',
+                'X-Provider-ID': payment_method.acb_provider_id,
+            }
+            params = {
+                'orderId': transaction_id,
+                'fromDate': (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d'),
+                'toDate': datetime.now().strftime('%Y-%m-%d'),
+                'page': 0,
+                'size': 10,
+            }
+
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+
+            if response.status_code != 200:
+                error_detail = response.text[:500] if response.text else 'No response body'
+                _logger.error(f"ACB query error: {response.status_code} {error_detail}")
+                return {'found': False, 'message': f'ACB API error: {response.status_code} - {error_detail}'}
+
+            data = response.json()
+            transactions = data.get('data', {}).get('content', [])
+
+            for tx in transactions:
+                tx_amount = tx.get('amount', 0)
+                tx_status = tx.get('status', '')
+                if int(float(tx_amount)) == int(amount) and tx_status in ('SUCCESS', 'COMPLETED', 'PAID'):
+                    return {
+                        'found': True,
+                        'data': {
+                            'traceNumber': tx.get('traceNumber'),
+                            'orderId': tx.get('orderId'),
+                            'virtualAccount': tx.get('virtualAccount'),
+                        }
+                    }
+
+            return {'found': False, 'message': 'Payment not found yet'}
+
+        except requests.Timeout:
+            return {'found': False, 'message': 'ACB API timeout'}
+        except Exception as e:
+            _logger.exception("Error checking ACB Pay transaction")
+            return {'found': False, 'message': str(e)}
+
+    # ==========================================
+    # ACB Pay Webhook Endpoints
+    # ==========================================
+
+    @http.route('/acb_pay/webhook/realtime', type='http', auth='public', methods=['POST'], csrf=False)
+    def acb_webhook_realtime(self, **kwargs):
+        """
+        Receive realtime transaction notification from ACB (TRANSACTION_UPDATE)
+
+        ACB pushes transaction data when QR payment is completed.
+        We respond with ACB's expected response format.
+        """
+        try:
+            # Get API key from header (check both Authorization and x-api-key)
+            auth_header = request.httprequest.headers.get('Authorization', '')
+            xapi_header = request.httprequest.headers.get('x-api-key', '')
+            api_key = auth_header or xapi_header
+            _logger.info(f"ACB webhook auth: Authorization={'***' + auth_header[-6:] if auth_header else 'empty'}, x-api-key={'***' + xapi_header[-6:] if xapi_header else 'empty'}, using={'Authorization' if auth_header else 'x-api-key' if xapi_header else 'none'}")
+            request_ip = request.httprequest.remote_addr
+
+            # Parse raw JSON body (ACB sends raw JSON, not JSON-RPC)
+            raw_body = request.httprequest.get_data(as_text=True)
+            _logger.info(f"ACB webhook raw body: {raw_body}")
+            data = json.loads(raw_body) if raw_body else {}
+            request_trace = data.get('requestTrace', '')
+            request_date_time = data.get('requestDateTime', '')
+
+            _logger.info(f"ACB webhook realtime received: {json.dumps(data)}")
+
+            # Helper to build ACB response format as HTTP Response
+            def _acb_response(code, message, reference=''):
+                resp = {
+                    'requestTrace': request_trace,
+                    'responseDateTime': request_date_time,
+                    'responseStatus': {
+                        'responseCode': code,
+                        'responseMessage': message,
+                    },
+                    'responseBody': {
+                        'index': 1,
+                        'referenceCode': reference,
+                    },
+                }
+                _logger.info(f"ACB webhook response: {json.dumps(resp)}")
+                return Response(
+                    json.dumps(resp),
+                    content_type='application/json',
+                    status=200,
+                )
+
+            # Find matching payment method by API key
+            payment_method = request.env['isd_payment.method'].sudo().search([
+                ('payment_provider', '=', 'acbpay'),
+                ('acb_api_key', '=', api_key),
+                ('active', '=', True),
+            ], limit=1)
+
+            if not payment_method:
+                _logger.warning(f"ACB webhook: invalid API key from {request_ip}")
+                return _acb_response('40100001', 'Invalid API key')
+
+            # Verify source IP
+            allowed_ips = [ip.strip() for ip in (payment_method.acb_webhook_ip or '').split(',') if ip.strip()]
+            if allowed_ips and request_ip not in allowed_ips:
+                _logger.warning(f"ACB webhook: blocked IP {request_ip}, allowed: {allowed_ips}")
+                return _acb_response('40300001', 'IP not allowed')
+
+            # Parse ACB webhook structure
+            request_params = data.get('requestParameters', {})
+            master_meta = request_params.get('masterMeta', {})
+            client_id = master_meta.get('clientId', '')
+            checksum = master_meta.get('checksum', '')
+
+            req = request_params.get('request', {})
+            request_meta = req.get('requestMeta', {})
+            request_code = request_meta.get('requestCode', '')
+
+            _logger.info(f"ACB webhook: clientId={client_id}, checksum={checksum}, requestCode={request_code}")
+
+            # Only process TRANSACTION_UPDATE
+            if request_code != 'TRANSACTION_UPDATE':
+                _logger.info(f"ACB webhook: ignoring requestCode={request_code}")
+                return _acb_response('00000000', 'Ignored')
+
+            # Get transactions list
+            request_params_inner = req.get('requestParams', {})
+            transactions = request_params_inner.get('transactions', [])
+
+            if not transactions:
+                _logger.warning("ACB webhook: no transactions in payload")
+                return _acb_response('40000001', 'No transactions')
+
+            # Process each transaction
+            confirmed_count = 0
+            last_ref = ''
+            for tx in transactions:
+                tx_status = tx.get('transactionStatus', '')
+                tx_amount = tx.get('amount', 0)
+                effective_date = tx.get('effectiveDate', '')
+                tx_entity = tx.get('transactionEntityAttribute', {})
+                trace_number = tx_entity.get('traceNumber', '') or ''
+                virtual_account = tx_entity.get('virtualAccount', '') or ''
+                reference_number = tx_entity.get('referenceNumber', '') or ''
+                beneficiary_name = tx_entity.get('beneficiaryName', '') or ''
+                merchant_id = tx_entity.get('custom1', '') or ''
+                terminal_id = tx_entity.get('custom2', '') or ''
+
+                _logger.info(
+                    f"ACB webhook tx: status={tx_status}, amount={tx_amount}, "
+                    f"traceNumber={trace_number}, virtualAccount={virtual_account}, "
+                    f"referenceNumber={reference_number}, beneficiaryName={beneficiary_name}, "
+                    f"merchantId={merchant_id}, terminalId={terminal_id}, effectiveDate={effective_date}"
+                )
+
+                # Only confirm when status is COMPLETED
+                if tx_status != 'COMPLETED':
+                    _logger.info(f"ACB webhook: status={tx_status}, skipping (not COMPLETED)")
+                    continue
+
+                # Find transaction: try traceNumber -> virtualAccount -> referenceNumber
+                transaction = None
+                if trace_number:
+                    transaction = request.env['isd_payment.transaction'].sudo().search([
+                        ('acb_trace_number', '=', trace_number),
+                        ('payment_method_id', '=', payment_method.id),
+                    ], limit=1)
+                    if transaction:
+                        _logger.info(f"ACB webhook: matched by traceNumber={trace_number}")
+
+                if not transaction and virtual_account:
+                    transaction = request.env['isd_payment.transaction'].sudo().search([
+                        ('acb_virtual_account', '=', virtual_account),
+                        ('payment_method_id', '=', payment_method.id),
+                        ('status', 'in', ('pending', 'processing')),
+                    ], limit=1)
+                    if transaction:
+                        _logger.info(f"ACB webhook: matched by virtualAccount={virtual_account}")
+
+                if not transaction and reference_number:
+                    transaction = request.env['isd_payment.transaction'].sudo().search([
+                        ('transaction_id', '=', reference_number),
+                        ('payment_method_id', '=', payment_method.id),
+                    ], limit=1)
+                    if transaction:
+                        _logger.info(f"ACB webhook: matched by referenceNumber={reference_number}")
+
+                if not transaction:
+                    _logger.warning(f"ACB webhook: transaction not found (traceNumber={trace_number}, virtualAccount={virtual_account}, referenceNumber={reference_number})")
+                    continue
+
+                # Already confirmed — skip
+                if transaction.status == 'confirmed':
+                    _logger.info(f"ACB webhook: transaction {transaction.transaction_id} already confirmed, skipping")
+                    last_ref = transaction.transaction_id
+                    continue
+
+                # Mark as confirmed
+                transaction.mark_as_confirmed_acb({
+                    'traceNumber': trace_number,
+                    'virtualAccount': virtual_account,
+                    'amount': tx_amount,
+                    'referenceNumber': reference_number,
+                })
+                confirmed_count += 1
+                last_ref = transaction.transaction_id
+                _logger.info(f"ACB webhook: confirmed transaction {transaction.transaction_id}")
+
+            _logger.info(f"ACB webhook: processed {len(transactions)} transactions, confirmed {confirmed_count}")
+            return _acb_response('00000000', 'Success', last_ref)
+
+        except Exception as e:
+            _logger.exception("Error processing ACB webhook")
+            resp = {
+                'requestTrace': '',
+                'responseDateTime': '',
+                'responseStatus': {
+                    'responseCode': '50000001',
+                    'responseMessage': 'Internal error',
+                },
+                'responseBody': {
+                    'index': 1,
+                    'referenceCode': '',
+                },
+            }
+            _logger.info(f"ACB webhook response (error): {json.dumps(resp)}")
+            return Response(
+                json.dumps(resp),
+                content_type='application/json',
+                status=200,
+            )
+
+    @http.route('/acb_pay/webhook/daily', type='http', auth='public', methods=['POST'], csrf=False)
+    def acb_webhook_daily(self, **kwargs):
+        """
+        Receive daily transaction history from ACB (T-1 reconciliation)
+
+        ACB sends TRANSACTION_HISTORY with batch transaction data.
+        Strategy: validate auth → save raw JSON to queue → response 200 immediately.
+        Reconciliation is processed later by cron job.
+        """
+        try:
+            # Get API key from header
+            auth_header = request.httprequest.headers.get('Authorization', '')
+            xapi_header = request.httprequest.headers.get('x-api-key', '')
+            api_key = auth_header or xapi_header
+            request_ip = request.httprequest.remote_addr
+
+            # Parse raw JSON body
+            raw_body = request.httprequest.get_data(as_text=True)
+            data = json.loads(raw_body) if raw_body else {}
+            request_trace = data.get('requestTrace', '')
+            request_date_time = data.get('requestDateTime', '')
+
+            _logger.info(f"ACB webhook daily: requestTrace={request_trace}, ip={request_ip}")
+
+            # Helper to build ACB response format
+            def _acb_response(code, message, reference=''):
+                resp = {
+                    'requestTrace': request_trace,
+                    'responseDateTime': request_date_time,
+                    'responseStatus': {
+                        'responseCode': code,
+                        'responseMessage': message,
+                    },
+                    'responseBody': {
+                        'index': 1,
+                        'referenceCode': reference,
+                    },
+                }
+                _logger.info(f"ACB webhook daily response: code={code}, message={message}")
+                return Response(
+                    json.dumps(resp),
+                    content_type='application/json',
+                    status=200,
+                )
+
+            # Find payment method by API key
+            payment_method = request.env['isd_payment.method'].sudo().search([
+                ('payment_provider', '=', 'acbpay'),
+                ('acb_api_key', '=', api_key),
+                ('active', '=', True),
+            ], limit=1)
+
+            if not payment_method:
+                _logger.warning(f"ACB webhook daily: invalid API key from {request_ip}")
+                return _acb_response('40100001', 'Invalid API key')
+
+            # Verify source IP
+            allowed_ips = [ip.strip() for ip in (payment_method.acb_webhook_ip or '').split(',') if ip.strip()]
+            if allowed_ips and request_ip not in allowed_ips:
+                _logger.warning(f"ACB webhook daily: blocked IP {request_ip}")
+                return _acb_response('40300001', 'IP not allowed')
+
+            # Parse request code
+            request_params = data.get('requestParameters', {})
+            req = request_params.get('request', {})
+            request_meta = req.get('requestMeta', {})
+            request_code = request_meta.get('requestCode', '')
+
+            if request_code != 'TRANSACTION_HISTORY':
+                _logger.info(f"ACB webhook daily: ignoring requestCode={request_code}")
+                return _acb_response('00000000', 'Ignored')
+
+            # Count transactions
+            request_params_inner = req.get('requestParams', {})
+            transactions = request_params_inner.get('transactions', [])
+            tx_count = len(transactions)
+
+            # Save to queue — response immediately
+            request.env['isd_payment.webhook_log'].sudo().create({
+                'payment_method_id': payment_method.id,
+                'request_trace': request_trace,
+                'request_code': request_code,
+                'raw_body': raw_body,
+                'transaction_count': tx_count,
+                'status': 'pending',
+                'request_ip': request_ip,
+            })
+
+            _logger.info(f"ACB webhook daily: queued {tx_count} transactions, requestTrace={request_trace}")
+            return _acb_response('00000000', 'Success')
+
+        except Exception as e:
+            _logger.exception("Error receiving ACB daily webhook")
+            resp = {
+                'requestTrace': '',
+                'responseDateTime': '',
+                'responseStatus': {
+                    'responseCode': '50000001',
+                    'responseMessage': 'Internal error',
+                },
+                'responseBody': {
+                    'index': 1,
+                    'referenceCode': '',
+                },
+            }
+            return Response(
+                json.dumps(resp),
+                content_type='application/json',
+                status=200,
+            )
+
+    # ==========================================
     # API Endpoint 1: Create Payment
     # ==========================================
 
     @http.route('/api/payment/<int:method_id>/create', type='json', auth='public', methods=['POST'], csrf=False)
-    def create_payment(self, method_id, amount=None, description='', **kwargs):
+    def create_payment(self, method_id, amount=None, description='', branch='', **kwargs):
         """
         Create payment and generate QR code
 
@@ -389,7 +860,46 @@ class IsdPaymentController(http.Controller):
             request_origin = request.httprequest.headers.get('Origin', '')
             request_ip = request.httprequest.remote_addr
 
-            if payment_method.payment_provider == 'vtcpay':
+            if payment_method.payment_provider == 'acbpay':
+                # ACB Pay: generate QR code via ACB API
+                transaction_id = request.env['isd_payment.transaction'].sudo().generate_transaction_id(
+                    payment_method.prefix
+                )
+                acb_result = self._create_acbpay_payment(payment_method, amount, transaction_id, description)
+                if not acb_result.get('found'):
+                    return {
+                        'success': False,
+                        'error': acb_result.get('message', 'ACB Pay error'),
+                        'error_code': 'ACBPAY_ERROR'
+                    }
+
+                transaction = request.env['isd_payment.transaction'].sudo().create({
+                    'payment_method_id': payment_method.id,
+                    'transaction_id': transaction_id,
+                    'amount': amount,
+                    'description': description,
+                    'branch': branch,
+                    'qr_url': acb_result.get('qr_url'),
+                    'acb_trace_number': acb_result.get('trace_number'),
+                    'acb_order_id': acb_result.get('order_id'),
+                    'acb_virtual_account': acb_result.get('virtual_account'),
+                    'acb_qr_data': acb_result.get('qr_data'),
+                    'status': 'pending',
+                    'request_origin': request_origin,
+                    'request_ip': request_ip,
+                })
+
+                return {
+                    'success': True,
+                    'data': {
+                        'transaction_id': transaction_id,
+                        'qr_url': acb_result.get('qr_url'),
+                        'amount': amount,
+                        'created_at': transaction.create_date.strftime('%Y-%m-%d %H:%M:%S') if transaction.create_date else None,
+                    }
+                }
+
+            elif payment_method.payment_provider == 'vtcpay':
                 # VTC Pay: generate redirect URL
                 base_url = request.env['ir.config_parameter'].sudo().get_param('web.base.url')
                 ipn_url = f"{base_url}/isd_payment/vtcpay/ipn"
@@ -407,6 +917,7 @@ class IsdPaymentController(http.Controller):
                     'transaction_id': transaction_id,
                     'amount': amount,
                     'description': description,
+                    'branch': branch,
                     'paypal_redirect_url': vtc_result.get('redirect_url'),
                     'status': 'pending',
                     'request_origin': request_origin,
@@ -440,6 +951,7 @@ class IsdPaymentController(http.Controller):
                     'amount': amount,
                     'amount_usd': paypal_result['amount_usd'],
                     'description': description,
+                    'branch': branch,
                     'paypal_order_id': order_id,
                     'paypal_redirect_url': paypal_result.get('redirect_url'),
                     'status': 'pending',
@@ -471,6 +983,7 @@ class IsdPaymentController(http.Controller):
                     'transaction_id': transaction_id,
                     'amount': amount,
                     'description': description,
+                    'branch': branch,
                     'qr_url': qr_url,
                     'bank_account': payment_method.provider_account_id,
                     'bank_code': payment_method.sepay_acc_bank,
@@ -583,7 +1096,29 @@ class IsdPaymentController(http.Controller):
                     'error_code': 'TRANSACTION_EXPIRED'
                 }
 
-            # Mark as processing
+            if payment_method.payment_provider == 'acbpay':
+                # ACB Pay: check DB only (payment confirmation comes via webhook, no DB update here)
+                if transaction.status == 'confirmed':
+                    return {
+                        'success': True,
+                        'status': 'confirmed',
+                        'message': 'Payment confirmed via ACB Pay',
+                        'data': {
+                            'transaction_id': transaction.transaction_id,
+                            'amount': transaction.amount,
+                            'confirmed_at': transaction.confirmed_at.strftime('%Y-%m-%d %H:%M:%S') if transaction.confirmed_at else None,
+                            'acb_trace_number': transaction.acb_trace_number,
+                            'acb_order_id': transaction.acb_order_id,
+                        }
+                    }
+                else:
+                    return {
+                        'success': True,
+                        'status': 'pending',
+                        'message': 'Waiting for payment confirmation from ACB',
+                    }
+
+            # Non-ACB providers: mark as processing and poll
             transaction.mark_as_processing()
 
             if payment_method.payment_provider == 'vtcpay':
@@ -730,7 +1265,7 @@ class IsdPaymentController(http.Controller):
 
             # Remove prefix to get random code
             # transaction_id format: {prefix}{random_code}
-            # Ví dụ: TEST_EO5JH16IWM -> remove 'TEST_' -> EO5JH16IWM
+            # Example: TEST_EO5JH16IWM -> remove 'TEST_' -> EO5JH16IWM
             transaction_code = transaction_id
             if prefix and transaction_id.startswith(prefix):
                 transaction_code = transaction_id[len(prefix):]

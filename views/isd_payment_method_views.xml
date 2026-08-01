@@ -89,6 +89,24 @@
                                     <field name="vtc_payment_type" placeholder="DomesticBank"/>
                                 </group>
                             </group>
+
+                            <!-- ACB Pay-specific fields -->
+                            <group invisible="payment_provider != 'acbpay'">
+                                <group string="ACB Pay Settings">
+                                    <field name="acb_owner_number" placeholder="X-Owner-Number from ACB"/>
+                                    <field name="acb_provider_id" placeholder="X-Provider-ID from ACB"/>
+                                    <field name="acb_merchant_id" placeholder="Merchant ID"/>
+                                    <field name="acb_terminal_id" placeholder="Terminal ID"/>
+                                    <field name="acb_user_id" placeholder="User ID from ACB"/>
+                                    <field name="acb_virtual_account_prefix" placeholder="Virtual Account Prefix"/>
+                                    <field name="acb_beneficiary_name" placeholder="Account holder name"/>
+                                    <field name="acb_account_number" placeholder="5798589"/>
+                                </group>
+                                <group string="ACB Pay Security">
+                                    <field name="acb_api_key" password="True" placeholder="x-api-key for webhook verification"/>
+                                    <field name="acb_webhook_ip" placeholder="124.197.28.244"/>
+                                </group>
+                            </group>
                         </page>
 
                         <page string="CORS Configuration" name="cors_config">
@@ -147,6 +165,7 @@
                 <field name="transaction_count"/>
                 <field name="pending_transaction_count"/>
                 <field name="confirmed_transaction_count"/>
+                <button name="action_view_transactions" type="object" icon="fa-money" string="" class="btn-link" title="View Transactions"/>
                 <field name="is_configured" widget="boolean_toggle"/>
                 <field name="active" widget="boolean_toggle"/>
                 <field name="company_id" groups="base.group_multi_company"/>
@@ -173,6 +192,7 @@
                 <filter string="SePay" name="sepay" domain="[('payment_provider','=','sepay')]"/>
                 <filter string="PayPal" name="paypal" domain="[('payment_provider','=','paypal')]"/>
                 <filter string="VTC Pay" name="vtcpay" domain="[('payment_provider','=','vtcpay')]"/>
+                <filter string="ACB Pay" name="acbpay" domain="[('payment_provider','=','acbpay')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Provider" name="group_provider" context="{'group_by':'payment_provider'}"/>
                     <filter string="Company" name="group_company" context="{'group_by':'company_id'}" groups="base.group_multi_company"/>
