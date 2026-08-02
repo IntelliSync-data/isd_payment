@@ -1261,7 +1261,7 @@ class IsdPaymentController(http.Controller):
 
             # Search for matching transaction
             transactions = response_data.get('transactions', [])
-            _logger.info(f"Found {len(transactions)} transactions from SePay")
+            _logger.info(f"SePay check: transaction_id={transaction_id}, amount={amount}, prefix={prefix}, found {len(transactions)} transactions")
 
             # Remove prefix to get random code
             # transaction_id format: {prefix}{random_code}
@@ -1270,9 +1270,12 @@ class IsdPaymentController(http.Controller):
             if prefix and transaction_id.startswith(prefix):
                 transaction_code = transaction_id[len(prefix):]
 
+            _logger.info(f"SePay matching: looking for code '{transaction_code}' in transaction contents")
+
             for tx in transactions:
                 tx_content = tx.get('transaction_content', '')
                 tx_amount = tx.get('amount_in', '0')
+                _logger.info(f"SePay tx: content='{tx_content}', amount_in={tx_amount}")
 
                 # Match transaction content (case-insensitive)
                 if transaction_code.upper() in tx_content.upper():
