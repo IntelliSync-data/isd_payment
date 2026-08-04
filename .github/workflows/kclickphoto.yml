@@ -1,0 +1,85 @@
+name: Update ISD Service Management KClickPhoto
+
+on:
+  push:
+    branches:
+      - kclickphoto
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Deploy isd_payment to Server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.KCLICKPHOTO_HOST }}
+        username: ${{ secrets.KCLICKPHOTO_USERNAME }}
+        key: ${{ secrets.KCLICKPHOTO_SSH_KEY }}
+        script_stop: true
+        script: |
+          # Clone if not exists, otherwise update
+          if [ ! -d ~/addons-system/isd_payment ]; then
+            git clone git@github.com:IntelliSync-data/isd_payment.git ~/addons-system/isd_payment
+            cd ~/addons-system/isd_payment && git checkout kclickphoto
+          else
+            cd ~/addons-system/isd_payment
+            git fetch origin && git reset --hard origin/kclickphoto
+          fi
+          
+          # Apply branch-specific override files
+          cp ~/addons-system/isd_payment/views/menu_items_override.xml.kclickphoto \
+             ~/addons-system/isd_payment/views/menu_items_override.xml
+          cp ~/addons-system/isd_payment/__manifest__.py.kclickphoto \
+             ~/addons-system/isd_payment/__manifest__.py
+
+          # Sync isd_payment directory with rsync (including deletions)
+          sudo mkdir -p /opt/custom-addons/isd_payment
+          sudo rsync -av --delete \
+            --exclude='views/menu_items_override.xml.*' \
+            --exclude='__manifest__.py.*' \
+            ~/addons-system/isd_payment/ /opt/custom-addons/isd_payment/
+
+    - name: Update isd_payment Module
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.KCLICKPHOTO_HOST }}
+        username: ${{ secrets.KCLICKPHOTO_USERNAME }}
+        key: ${{ secrets.KCLICKPHOTO_SSH_KEY }}
+        script: |
+          echo "Updating apps list..."
+          echo "env['ir.module.module'].update_list(); env.cr.commit()" | sudo -u odoo /odoo-venv/bin/python /odoo18/odoo-bin shell -c /odoo.conf -d ${{ secrets.KCLICKPHOTO_DB_NAME }} --no-http
+          echo "Updating isd_payment module..."
+          sudo -u odoo /odoo-venv/bin/python /odoo18/odoo-bin -c /odoo.conf -d ${{ secrets.KCLICKPHOTO_DB_NAME }} -u isd_payment --stop-after-init --no-http || \
+            echo "Module not installed yet (now visible in Apps list), continuing..."
+
+    - name: Restart Odoo Service
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.KCLICKPHOTO_HOST }}
+        username: ${{ secrets.KCLICKPHOTO_USERNAME }}
+        key: ${{ secrets.KCLICKPHOTO_SSH_KEY }}
+        script: |
+          sudo systemctl restart odoo
+
+    - name: Verify Odoo Service
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.KCLICKPHOTO_HOST }}
+        username: ${{ secrets.KCLICKPHOTO_USERNAME }}
+        key: ${{ secrets.KCLICKPHOTO_SSH_KEY }}
+        script: |
+          sleep 5
+          if sudo systemctl is-active --quiet odoo; then
+            echo "Odoo restarted successfully"
+          else
+            echo "Odoo failed to restart"
+            echo "=== systemctl status ==="
+            sudo systemctl status odoo --no-pager
+            echo "=== Last 50 lines of Odoo log ==="
+            sudo tail -n 50 /var/log/odoo/odoo.log
+            exit 1
+          fi
