@@ -23,7 +23,7 @@ jobs:
         script: |
           # Clone if not exists, otherwise update
           if [ ! -d ~/addons-system/isd_payment ]; then
-            git clone git@github.com:IntelliSync-data/isd_payment.git ~/addons-system/isd_payment
+            git clone git@github-odoo:IntelliSync-data/isd_payment.git ~/addons-system/isd_payment
             cd ~/addons-system/isd_payment && git checkout kclickphoto
           else
             cd ~/addons-system/isd_payment
