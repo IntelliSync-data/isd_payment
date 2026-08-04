@@ -22,26 +22,20 @@ jobs:
         script_stop: true
         script: |
           # Clone if not exists, otherwise update
-          if [ ! -d ~/addons-system/isd_payment ]; then
-            git clone git@github-odoo:IntelliSync-data/isd_payment.git ~/addons-system/isd_payment
-            cd ~/addons-system/isd_payment && git checkout kclickphoto
+          if [ ! -d /home/odoo/addons-system/isd_payment ]; then
+            sudo -u odoo git clone git@github-odoo:IntelliSync-data/isd_payment.git /home/odoo/addons-system/isd_payment
+            cd /home/odoo/addons-system/isd_payment && git checkout kclickphoto
           else
-            cd ~/addons-system/isd_payment
-            git fetch origin && git reset --hard origin/kclickphoto
+            cd /home/odoo/addons-system/isd_payment
+            sudo -u odoo git fetch origin && sudo -u odoo git reset --hard origin/kclickphoto
           fi
-          
-          # Apply branch-specific override files
-          cp ~/addons-system/isd_payment/views/menu_items_override.xml.kclickphoto \
-             ~/addons-system/isd_payment/views/menu_items_override.xml
-          cp ~/addons-system/isd_payment/__manifest__.py.kclickphoto \
-             ~/addons-system/isd_payment/__manifest__.py
 
           # Sync isd_payment directory with rsync (including deletions)
           sudo mkdir -p /opt/custom-addons/isd_payment
           sudo rsync -av --delete \
             --exclude='views/menu_items_override.xml.*' \
             --exclude='__manifest__.py.*' \
-            ~/addons-system/isd_payment/ /opt/custom-addons/isd_payment/
+            /home/odoo/addons-system/isd_payment/ /opt/custom-addons/isd_payment/
 
     - name: Update isd_payment Module
       uses: appleboy/ssh-action@master
