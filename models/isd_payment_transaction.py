@@ -31,6 +31,12 @@ class IsdPaymentTransaction(models.Model):
     )
 
     active = fields.Boolean(string='Active', default=True)
+    user_id = fields.Many2one(
+        'res.users', string='Assigned User',
+        default=lambda self: self.env.user,
+        index=True,
+        help='User responsible for this transaction'
+    )
 
     # Transaction Info
     transaction_id = fields.Char(

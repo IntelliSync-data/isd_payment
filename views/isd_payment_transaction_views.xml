@@ -25,6 +25,7 @@
                             <field name="branch"/>
                         </group>
                         <group>
+                            <field name="user_id"/>
                             <field name="create_date" string="Created At"/>
                             <field name="confirmed_at"/>
                             <field name="expired_at"/>
@@ -104,6 +105,7 @@
             <list string="Transactions" create="false" decoration-success="status == 'confirmed'" decoration-muted="status == 'expired'" decoration-danger="status in ('failed', 'cancelled')">
                 <field name="transaction_id"/>
                 <field name="payment_method_id"/>
+                <field name="user_id" widget="many2one_avatar_user" optional="show"/>
                 <field name="branch"/>
                 <field name="amount" sum="Total Amount"/>
                 <field name="status" widget="badge" decoration-success="status == 'confirmed'" decoration-info="status in ('pending', 'processing')" decoration-danger="status in ('failed', 'cancelled')" decoration-muted="status == 'expired'"/>
@@ -150,6 +152,7 @@
                 <filter string="Review" name="recon_review" domain="[('reconciliation_status','=','review')]"/>
                 <filter string="Data Bank" name="recon_bank" domain="[('reconciliation_status','=','bank_data')]"/>
                 <group expand="0" string="Group By">
+                    <filter string="Assigned User" name="group_user" context="{'group_by':'user_id'}"/>
                     <filter string="Branch" name="group_branch" context="{'group_by':'branch'}"/>
                     <filter string="Payment Method" name="group_payment_method" context="{'group_by':'payment_method_id'}"/>
                     <filter string="Status" name="group_status" context="{'group_by':'status'}"/>

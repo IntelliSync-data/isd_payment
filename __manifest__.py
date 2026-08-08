@@ -43,6 +43,7 @@ Use Cases:
         'web',
     ],
     'data': [
+        'security/isd_payment_security.xml',
         'security/ir.model.access.csv',
         'views/isd_payment_method_views.xml',
         'views/isd_payment_transaction_views.xml',

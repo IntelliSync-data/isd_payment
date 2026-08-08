@@ -28,6 +28,11 @@ class IsdPaymentMethod(models.Model):
         default=True,
         help='Uncheck to archive this payment method'
     )
+    user_ids = fields.Many2many(
+        'res.users', 'isd_payment_method_user_rel', 'method_id', 'user_id',
+        string='Assigned Users',
+        help='Users who can see this payment method and its transactions'
+    )
     company_id = fields.Many2one(
         'res.company',
         string='Company',

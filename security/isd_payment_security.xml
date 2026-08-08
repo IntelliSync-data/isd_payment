@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Category -->
+    <record id="module_category_isd_payment" model="ir.module.category">
+        <field name="name">ISD Payment</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <!-- Groups -->
+    <record id="group_isd_payment_user" model="res.groups">
+        <field name="name">User</field>
+        <field name="category_id" ref="module_category_isd_payment"/>
+    </record>
+
+    <record id="group_isd_payment_manager" model="res.groups">
+        <field name="name">Manager</field>
+        <field name="category_id" ref="module_category_isd_payment"/>
+        <field name="implied_ids" eval="[(4, ref('group_isd_payment_user'))]"/>
+        <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+    </record>
+
+    <!-- Record Rules -->
+
+    <!-- Payment Method: user sees assigned, manager sees all -->
+    <record id="rule_payment_method_user" model="ir.rule">
+        <field name="name">Payment Method: User sees assigned</field>
+        <field name="model_id" ref="model_isd_payment_method"/>
+        <field name="domain_force">[('user_ids', 'in', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_isd_payment_user'))]"/>
+    </record>
+
+    <record id="rule_payment_method_manager" model="ir.rule">
+        <field name="name">Payment Method: Manager sees all</field>
+        <field name="model_id" ref="model_isd_payment_method"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_isd_payment_manager'))]"/>
+    </record>
+
+    <!-- Transaction: user sees assigned, manager sees all -->
+    <record id="rule_payment_transaction_user" model="ir.rule">
+        <field name="name">Transaction: User sees assigned</field>
+        <field name="model_id" ref="model_isd_payment_transaction"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_isd_payment_user'))]"/>
+    </record>
+
+    <record id="rule_payment_transaction_manager" model="ir.rule">
+        <field name="name">Transaction: Manager sees all</field>
+        <field name="model_id" ref="model_isd_payment_transaction"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_isd_payment_manager'))]"/>
+    </record>
+
+    <!-- Webhook Log: manager only -->
+    <record id="rule_webhook_log_manager" model="ir.rule">
+        <field name="name">Webhook Log: Manager sees all</field>
+        <field name="model_id" ref="model_isd_payment_webhook_log"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_isd_payment_manager'))]"/>
+    </record>
+</odoo>

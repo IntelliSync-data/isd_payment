@@ -12,6 +12,7 @@
               name="Payment Methods"
               parent="menu_isd_payment_root"
               action="action_isd_payment_method"
+              groups="group_isd_payment_user"
               sequence="10"/>
 
     <!-- Transactions Menu -->
@@ -19,6 +20,7 @@
               name="Transactions"
               parent="menu_isd_payment_root"
               action="action_isd_payment_transaction"
+              groups="group_isd_payment_user"
               sequence="20"/>
 
     <!-- Configuration Menu -->
