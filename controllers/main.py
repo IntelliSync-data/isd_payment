@@ -214,13 +214,23 @@ class IsdPaymentController(http.Controller):
             _logger.exception("Error checking VTC Pay transaction")
             return {'found': False, 'message': str(e)}
 
-    def _create_paypal_payment(self, payment_method, amount):
-        """Create PayPal order and return redirect URL"""
+    def _create_paypal_payment(self, payment_method, amount, already_converted=False):
+        """Create PayPal order and return redirect URL
+
+        Args:
+            payment_method: isd_payment.method record
+            amount: amount to charge (in VND by default, or USD if already_converted=True)
+            already_converted: if True, amount is already in USD, skip conversion
+        """
         try:
             token = self._get_paypal_token(payment_method)
             order_url = f"{payment_method.provider_host}/v2/checkout/orders"
-            exchange_rate = payment_method.paypal_usd_exchange_rate or 26300.0
-            amount_usd = round(amount / exchange_rate, 2)
+
+            if already_converted:
+                amount_usd = round(amount, 2)
+            else:
+                exchange_rate = payment_method.paypal_usd_exchange_rate or 26300.0
+                amount_usd = round(amount / exchange_rate, 2)
 
             body = {
                 "intent": "CAPTURE",
