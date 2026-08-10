@@ -105,6 +105,9 @@
                                 </group>
                                 <group string="ACB Pay Security">
                                     <field name="acb_api_key" password="True" placeholder="x-api-key for webhook verification"/>
+                                    <button name="action_generate_acb_api_key" type="object"
+                                            string="Generate API Key" class="btn-secondary btn-sm"
+                                            icon="fa-refresh" confirm="This will replace the current API Key. Continue?"/>
                                     <field name="acb_webhook_ip" placeholder="124.197.28.244"/>
                                 </group>
                             </group>

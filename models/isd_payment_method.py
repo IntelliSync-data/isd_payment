@@ -3,6 +3,7 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 import re
+import secrets
 
 
 class IsdPaymentMethod(models.Model):
@@ -297,6 +298,19 @@ class IsdPaymentMethod(models.Model):
             f"&amount={int(amount)}"
             f"&des={quote(transaction_id)}"
         )
+
+    def action_generate_acb_api_key(self):
+        self.ensure_one()
+        self.acb_api_key = secrets.token_urlsafe(32)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'message': _('API Key generated successfully!'),
+                'type': 'success',
+                'sticky': False,
+            },
+        }
 
     def action_view_api_documentation(self):
         self.ensure_one()
