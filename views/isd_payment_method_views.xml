@@ -93,6 +93,10 @@
 
                             <!-- ACB Pay-specific fields -->
                             <group invisible="payment_provider != 'acbpay'">
+                                <group string="ACB Pay Connection">
+                                    <field name="acb_token_url"
+                                           placeholder="https://partner.acb.vn/acb/open/iam/id/v1/auth/realms/soba/protocol/openid-connect/token"/>
+                                </group>
                                 <group string="ACB Pay Settings">
                                     <field name="acb_owner_number" placeholder="X-Owner-Number from ACB"/>
                                     <field name="acb_provider_id" placeholder="X-Provider-ID from ACB"/>

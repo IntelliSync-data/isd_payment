@@ -96,6 +96,10 @@ class IsdPaymentMethod(models.Model):
     )
 
     # ACB Pay-specific Configuration
+    acb_token_url = fields.Char(
+        string='Token URL',
+        help='ACB OAuth2 token endpoint (e.g. https://partner.acb.vn/acb/open/iam/id/v1/auth/realms/soba/protocol/openid-connect/token)',
+    )
     acb_api_key = fields.Char(
         string='API Key',
         help='ACB webhook x-api-key for verifying callbacks'

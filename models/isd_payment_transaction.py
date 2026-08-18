@@ -317,7 +317,7 @@ class IsdPaymentTransaction(models.Model):
     def _get_acb_token(self):
         """Get ACB Bearer token via OAuth2 (reusable from transaction model)"""
         pm = self.payment_method_id
-        token_url = f"{pm.provider_host}/acb/open/iam/id/v1/auth/realms/soba/protocol/openid-connect/token"
+        token_url = pm.acb_token_url or f"{pm.provider_host}/acb/open/iam/id/v1/auth/realms/soba/protocol/openid-connect/token"
         auth_str = base64.b64encode(
             f"{pm.provider_account_id}:{pm.provider_secret}".encode()
         ).decode()

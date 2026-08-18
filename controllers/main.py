@@ -349,7 +349,7 @@ class IsdPaymentController(http.Controller):
 
     def _get_acb_token(self, payment_method):
         """Get ACB Bearer token via OAuth2 client_credentials"""
-        token_url = f"{payment_method.provider_host}/acb/open/iam/id/v1/auth/realms/soba/protocol/openid-connect/token"
+        token_url = payment_method.acb_token_url or f"{payment_method.provider_host}/acb/open/iam/id/v1/auth/realms/soba/protocol/openid-connect/token"
         import base64
         auth_str = base64.b64encode(
             f"{payment_method.provider_account_id}:{payment_method.provider_secret}".encode()
