@@ -528,17 +528,17 @@ class IsdPaymentController(http.Controller):
             auth_header = request.httprequest.headers.get('Authorization', '')
             xapi_header = request.httprequest.headers.get('x-api-key', '')
             api_key = auth_header or xapi_header
-            _logger.info(f"ACB webhook auth: Authorization={'***' + auth_header[-6:] if auth_header else 'empty'}, x-api-key={'***' + xapi_header[-6:] if xapi_header else 'empty'}, using={'Authorization' if auth_header else 'x-api-key' if xapi_header else 'none'}")
+            _logger.info(f"[ACB API2 Realtime] auth: Authorization={'***' + auth_header[-6:] if auth_header else 'empty'}, x-api-key={'***' + xapi_header[-6:] if xapi_header else 'empty'}, using={'Authorization' if auth_header else 'x-api-key' if xapi_header else 'none'}")
             request_ip = request.httprequest.remote_addr
 
             # Parse raw JSON body (ACB sends raw JSON, not JSON-RPC)
             raw_body = request.httprequest.get_data(as_text=True)
-            _logger.info(f"ACB webhook raw body: {raw_body}")
+            _logger.info(f"[ACB API2 Realtime] raw body: {raw_body}")
             data = json.loads(raw_body) if raw_body else {}
             request_trace = data.get('requestTrace', '')
             request_date_time = data.get('requestDateTime', '')
 
-            _logger.info(f"ACB webhook realtime received: {json.dumps(data)}")
+            _logger.info(f"[ACB API2 Realtime] received: {json.dumps(data)}")
 
             # Helper to build ACB response format as HTTP Response
             def _acb_response(code, message, reference=''):
@@ -554,7 +554,7 @@ class IsdPaymentController(http.Controller):
                         'referenceCode': reference,
                     },
                 }
-                _logger.info(f"ACB webhook response: {json.dumps(resp)}")
+                _logger.info(f"[ACB API2 Realtime] response: {json.dumps(resp)}")
                 return Response(
                     json.dumps(resp),
                     content_type='application/json',
@@ -569,13 +569,13 @@ class IsdPaymentController(http.Controller):
             ], limit=1)
 
             if not payment_method:
-                _logger.warning(f"ACB webhook: invalid API key from {request_ip}")
+                _logger.warning(f"[ACB API2 Realtime] invalid API key from {request_ip}")
                 return _acb_response('40100001', 'Invalid API key')
 
             # Verify source IP
             allowed_ips = [ip.strip() for ip in (payment_method.acb_webhook_ip or '').split(',') if ip.strip()]
             if allowed_ips and request_ip not in allowed_ips:
-                _logger.warning(f"ACB webhook: blocked IP {request_ip}, allowed: {allowed_ips}")
+                _logger.warning(f"[ACB API2 Realtime] blocked IP {request_ip}, allowed: {allowed_ips}")
                 return _acb_response('40300001', 'IP not allowed')
 
             # Parse ACB webhook structure
@@ -588,11 +588,11 @@ class IsdPaymentController(http.Controller):
             request_meta = req.get('requestMeta', {})
             request_code = request_meta.get('requestCode', '')
 
-            _logger.info(f"ACB webhook: clientId={client_id}, checksum={checksum}, requestCode={request_code}")
+            _logger.info(f"[ACB API2 Realtime] clientId={client_id}, checksum={checksum}, requestCode={request_code}")
 
             # Only process TRANSACTION_UPDATE
             if request_code != 'TRANSACTION_UPDATE':
-                _logger.info(f"ACB webhook: ignoring requestCode={request_code}")
+                _logger.info(f"[ACB API2 Realtime] ignoring requestCode={request_code}")
                 return _acb_response('00000000', 'Ignored')
 
             # Get transactions list
@@ -600,7 +600,7 @@ class IsdPaymentController(http.Controller):
             transactions = request_params_inner.get('transactions', [])
 
             if not transactions:
-                _logger.warning("ACB webhook: no transactions in payload")
+                _logger.warning("[ACB API2 Realtime] no transactions in payload")
                 return _acb_response('40000001', 'No transactions')
 
             # Process each transaction
@@ -619,7 +619,7 @@ class IsdPaymentController(http.Controller):
                 terminal_id = tx_entity.get('custom2', '') or ''
 
                 _logger.info(
-                    f"ACB webhook tx: status={tx_status}, amount={tx_amount}, "
+                    f"[ACB API2 Realtime] tx: status={tx_status}, amount={tx_amount}, "
                     f"traceNumber={trace_number}, virtualAccount={virtual_account}, "
                     f"referenceNumber={reference_number}, beneficiaryName={beneficiary_name}, "
                     f"merchantId={merchant_id}, terminalId={terminal_id}, effectiveDate={effective_date}"
@@ -627,7 +627,7 @@ class IsdPaymentController(http.Controller):
 
                 # Only confirm when status is COMPLETED
                 if tx_status != 'COMPLETED':
-                    _logger.info(f"ACB webhook: status={tx_status}, skipping (not COMPLETED)")
+                    _logger.info(f"[ACB API2 Realtime] status={tx_status}, skipping (not COMPLETED)")
                     continue
 
                 # Find transaction: try traceNumber -> virtualAccount -> referenceNumber
@@ -638,7 +638,7 @@ class IsdPaymentController(http.Controller):
                         ('payment_method_id', '=', payment_method.id),
                     ], limit=1)
                     if transaction:
-                        _logger.info(f"ACB webhook: matched by traceNumber={trace_number}")
+                        _logger.info(f"[ACB API2 Realtime] matched by traceNumber={trace_number}")
 
                 if not transaction and virtual_account:
                     transaction = request.env['isd_payment.transaction'].sudo().search([
@@ -647,7 +647,7 @@ class IsdPaymentController(http.Controller):
                         ('status', 'in', ('pending', 'processing')),
                     ], limit=1)
                     if transaction:
-                        _logger.info(f"ACB webhook: matched by virtualAccount={virtual_account}")
+                        _logger.info(f"[ACB API2 Realtime] matched by virtualAccount={virtual_account}")
 
                 if not transaction and reference_number:
                     transaction = request.env['isd_payment.transaction'].sudo().search([
@@ -655,15 +655,15 @@ class IsdPaymentController(http.Controller):
                         ('payment_method_id', '=', payment_method.id),
                     ], limit=1)
                     if transaction:
-                        _logger.info(f"ACB webhook: matched by referenceNumber={reference_number}")
+                        _logger.info(f"[ACB API2 Realtime] matched by referenceNumber={reference_number}")
 
                 if not transaction:
-                    _logger.warning(f"ACB webhook: transaction not found (traceNumber={trace_number}, virtualAccount={virtual_account}, referenceNumber={reference_number})")
+                    _logger.warning(f"[ACB API2 Realtime] transaction not found (traceNumber={trace_number}, virtualAccount={virtual_account}, referenceNumber={reference_number})")
                     continue
 
                 # Already confirmed — skip
                 if transaction.status == 'confirmed':
-                    _logger.info(f"ACB webhook: transaction {transaction.transaction_id} already confirmed, skipping")
+                    _logger.info(f"[ACB API2 Realtime] transaction {transaction.transaction_id} already confirmed, skipping")
                     last_ref = transaction.transaction_id
                     continue
 
@@ -676,13 +676,13 @@ class IsdPaymentController(http.Controller):
                 })
                 confirmed_count += 1
                 last_ref = transaction.transaction_id
-                _logger.info(f"ACB webhook: confirmed transaction {transaction.transaction_id}")
+                _logger.info(f"[ACB API2 Realtime] confirmed transaction {transaction.transaction_id}")
 
-            _logger.info(f"ACB webhook: processed {len(transactions)} transactions, confirmed {confirmed_count}")
+            _logger.info(f"[ACB API2 Realtime] processed {len(transactions)} transactions, confirmed {confirmed_count}")
             return _acb_response('00000000', 'Success', last_ref)
 
         except Exception as e:
-            _logger.exception("Error processing ACB webhook")
+            _logger.exception("[ACB API2 Realtime] Error processing webhook")
             resp = {
                 'requestTrace': '',
                 'responseDateTime': '',
@@ -695,7 +695,7 @@ class IsdPaymentController(http.Controller):
                     'referenceCode': '',
                 },
             }
-            _logger.info(f"ACB webhook response (error): {json.dumps(resp)}")
+            _logger.info(f"[ACB API2 Realtime] response (error): {json.dumps(resp)}")
             return Response(
                 json.dumps(resp),
                 content_type='application/json',
@@ -724,7 +724,7 @@ class IsdPaymentController(http.Controller):
             request_trace = data.get('requestTrace', '')
             request_date_time = data.get('requestDateTime', '')
 
-            _logger.info(f"ACB webhook daily: requestTrace={request_trace}, ip={request_ip}")
+            _logger.info(f"[ACB API3 Daily] requestTrace={request_trace}, ip={request_ip}")
 
             # Helper to build ACB response format
             def _acb_response(code, message, reference=''):
@@ -740,7 +740,7 @@ class IsdPaymentController(http.Controller):
                         'referenceCode': reference,
                     },
                 }
-                _logger.info(f"ACB webhook daily response: code={code}, message={message}")
+                _logger.info(f"[ACB API3 Daily] response: code={code}, message={message}")
                 return Response(
                     json.dumps(resp),
                     content_type='application/json',
@@ -755,13 +755,13 @@ class IsdPaymentController(http.Controller):
             ], limit=1)
 
             if not payment_method:
-                _logger.warning(f"ACB webhook daily: invalid API key from {request_ip}")
+                _logger.warning(f"[ACB API3 Daily] invalid API key from {request_ip}")
                 return _acb_response('40100001', 'Invalid API key')
 
             # Verify source IP
             allowed_ips = [ip.strip() for ip in (payment_method.acb_webhook_ip or '').split(',') if ip.strip()]
             if allowed_ips and request_ip not in allowed_ips:
-                _logger.warning(f"ACB webhook daily: blocked IP {request_ip}")
+                _logger.warning(f"[ACB API3 Daily] blocked IP {request_ip}")
                 return _acb_response('40300001', 'IP not allowed')
 
             # Parse request code
@@ -771,15 +771,15 @@ class IsdPaymentController(http.Controller):
             request_code = request_meta.get('requestCode', '')
 
             if request_code != 'TRANSACTION_HISTORY':
-                _logger.info(f"ACB webhook daily: ignoring requestCode={request_code}")
+                _logger.info(f"[ACB API3 Daily] ignoring requestCode={request_code}")
                 return _acb_response('00000000', 'Ignored')
 
-            # Count transactions
+            # Get transactions (ACB sends max 1000 per call)
             request_params_inner = req.get('requestParams', {})
             transactions = request_params_inner.get('transactions', [])
             tx_count = len(transactions)
 
-            # Save to queue — response immediately
+            # Save to queue — response immediately, process async via cron
             request.env['isd_payment.webhook_log'].sudo().create({
                 'payment_method_id': payment_method.id,
                 'request_trace': request_trace,
@@ -790,11 +790,18 @@ class IsdPaymentController(http.Controller):
                 'request_ip': request_ip,
             })
 
-            _logger.info(f"ACB webhook daily: queued {tx_count} transactions, requestTrace={request_trace}")
+            _logger.info(f"[ACB API3 Daily] queued {tx_count} transactions, requestTrace={request_trace}")
+
+            # Trigger cron to run immediately (async, non-blocking)
+            cron = request.env.ref('isd_payment.cron_process_acb_webhook_queue', raise_if_not_found=False)
+            if cron:
+                cron.sudo()._trigger()
+                _logger.info("[ACB API3 Daily] cron triggered to process queue")
+
             return _acb_response('00000000', 'Success')
 
         except Exception as e:
-            _logger.exception("Error receiving ACB daily webhook")
+            _logger.exception("[ACB API3 Daily] Error receiving webhook")
             resp = {
                 'requestTrace': '',
                 'responseDateTime': '',

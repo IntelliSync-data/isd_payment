@@ -53,6 +53,9 @@ class IsdPaymentWebhookLog(models.Model):
         """Retry processing a failed log"""
         self.ensure_one()
         self.write({'status': 'pending', 'error_message': False})
+        cron = self.env.ref('isd_payment.cron_process_acb_webhook_queue', raise_if_not_found=False)
+        if cron:
+            cron.sudo()._trigger()
 
     @api.model
     def cron_process_webhook_queue(self):
@@ -62,7 +65,7 @@ class IsdPaymentWebhookLog(models.Model):
         """
         pending_logs = self.search([
             ('status', '=', 'pending'),
-        ], order='create_date asc', limit=10)
+        ], order='create_date asc')
 
         for log in pending_logs:
             try:
