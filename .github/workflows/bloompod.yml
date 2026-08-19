@@ -51,9 +51,9 @@ jobs:
         key: ${{ secrets.BLOOMPOD_SSH_KEY }}
         script: |
           echo "Updating apps list..."
-          echo "env['ir.module.module'].update_list(); env.cr.commit()" | sudo -u odoo /odoo-venv/bin/python /odoo18/odoo-bin shell -c /odoo.conf -d ${{ secrets.BLOOMPOD_DB_NAME }} --no-http
+          echo "env['ir.module.module'].update_list(); env.cr.commit()" | sudo -u ubuntu /odoo-venv/bin/python /odoo18/odoo-bin shell -c /odoo.conf -d ${{ secrets.BLOOMPOD_DB_NAME }} --no-http
           echo "Updating isd_payment module..."
-          sudo -u odoo /odoo-venv/bin/python /odoo18/odoo-bin -c /odoo.conf -d ${{ secrets.BLOOMPOD_DB_NAME }} -u isd_payment --stop-after-init --no-http || \
+          sudo -u ubuntu /odoo-venv/bin/python /odoo18/odoo-bin -c /odoo.conf -d ${{ secrets.BLOOMPOD_DB_NAME }} -u isd_payment --stop-after-init --no-http || \
             echo "Module not installed yet (now visible in Apps list), continuing..."
 
     - name: Restart Odoo Service
