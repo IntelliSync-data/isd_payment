@@ -123,6 +123,31 @@ class IsdPaymentWebhookLog(models.Model):
 
         _logger.info(f"Webhook log {self.id}: processing {len(transactions)} transactions for date {recon_date}")
 
+        # Filter transactions by merchant identity (custom1/custom2 must match payment method config)
+        merchant_ids = set(filter(None, [
+            payment_method.acb_merchant_id,
+            payment_method.acb_terminal_id,
+            payment_method.acb_user_id,
+        ]))
+        if merchant_ids:
+            filtered_transactions = []
+            for tx in transactions:
+                tx_entity = tx.get('transactionEntityAttribute', {})
+                custom1 = (tx_entity.get('custom1', '') or '').strip()
+                custom2 = (tx_entity.get('custom2', '') or '').strip()
+                tx_identifiers = set(filter(None, [custom1, custom2]))
+                if tx_identifiers & merchant_ids:
+                    filtered_transactions.append(tx)
+            _logger.info(
+                f"Webhook log {self.id}: filtered {len(filtered_transactions)}/{len(transactions)} "
+                f"transactions matching merchant config"
+            )
+            transactions = filtered_transactions
+
+        if not transactions:
+            _logger.info(f"Webhook log {self.id}: no matching transactions after merchant filter")
+            return
+
         for tx in transactions:
             tx_status = tx.get('transactionStatus', '')
             tx_amount = tx.get('amount', 0)

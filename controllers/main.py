@@ -625,6 +625,18 @@ class IsdPaymentController(http.Controller):
                     f"merchantId={merchant_id}, terminalId={terminal_id}, effectiveDate={effective_date}"
                 )
 
+                # Filter by merchant identity — skip transactions not belonging to this payment method
+                pm_identifiers = set(filter(None, [
+                    payment_method.acb_merchant_id,
+                    payment_method.acb_terminal_id,
+                    payment_method.acb_user_id,
+                ]))
+                if pm_identifiers:
+                    tx_identifiers = set(filter(None, [merchant_id.strip(), terminal_id.strip()]))
+                    if not (tx_identifiers & pm_identifiers):
+                        _logger.info(f"[ACB API2 Realtime] skipping tx, merchant mismatch (custom1={merchant_id}, custom2={terminal_id})")
+                        continue
+
                 # Only confirm when status is COMPLETED
                 if tx_status != 'COMPLETED':
                     _logger.info(f"[ACB API2 Realtime] status={tx_status}, skipping (not COMPLETED)")
