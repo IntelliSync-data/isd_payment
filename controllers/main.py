@@ -8,6 +8,7 @@ import requests
 import re
 from datetime import datetime, timedelta
 from urllib.parse import quote
+import unicodedata
 
 _logger = logging.getLogger(__name__)
 
@@ -416,7 +417,7 @@ class IsdPaymentController(http.Controller):
                     'virtualAccountPrefix': payment_method.acb_virtual_account_prefix,
                     'beneficiaryName': payment_method.acb_beneficiary_name,
                     'amount': int(amount),
-                    'description': re.sub(r'[^a-zA-Z0-9\s]', '', description or f'Payment {order_id}'),
+                    'description': re.sub(r'[^a-zA-Z0-9\s]', '', unicodedata.normalize('NFD', description or f'Payment {order_id}').encode('ascii', 'ignore').decode('ascii')),
                     'additionalInfo': [
                         {'key': 'key', 'value': 'value'}
                     ],
