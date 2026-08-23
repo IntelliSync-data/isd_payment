@@ -38,9 +38,9 @@
 
     <!-- Transaction: user sees assigned, manager sees all -->
     <record id="rule_payment_transaction_user" model="ir.rule">
-        <field name="name">Transaction: User sees assigned</field>
+        <field name="name">Transaction: User sees assigned payment method</field>
         <field name="model_id" ref="model_isd_payment_transaction"/>
-        <field name="domain_force">[('user_id', '=', user.id)]</field>
+        <field name="domain_force">[('payment_method_id.user_ids', 'in', user.id)]</field>
         <field name="groups" eval="[(4, ref('group_isd_payment_user'))]"/>
     </record>
 
