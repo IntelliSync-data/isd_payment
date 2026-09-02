@@ -1149,7 +1149,8 @@ class IsdPaymentController(http.Controller):
                     }
 
             # Non-ACB providers: mark as processing and poll
-            transaction.mark_as_processing()
+            if transaction.status != 'processing':
+                transaction.mark_as_processing()
 
             if payment_method.payment_provider == 'vtcpay':
                 # VTC Pay: poll order status
