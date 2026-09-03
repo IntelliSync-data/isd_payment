@@ -3,7 +3,7 @@
 
     <!-- Main Menu -->
     <menuitem id="menu_isd_payment_root"
-              name="ISD Payment"
+              name="Payment (by ISD)"
               sequence="10"
               web_icon="isd_payment,static/description/icon.png"/>
 
