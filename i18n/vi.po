@@ -881,5 +881,5 @@ msgstr "ACB Webhook: Xử lý đối soát"
 
 #. module: isd_payment
 #: model:ir.cron,name:isd_payment.cron_process_acb_webhook_queue
-msgid "Payment Manager (by ISD)"
-msgstr "QL Thanh Toán (bởi ISD)"
+msgid "Payment (by ISD)"
+msgstr "QL Thanh toán (bởi ISD)"
