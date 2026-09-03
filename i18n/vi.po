@@ -878,3 +878,8 @@ msgstr "Giao dịch này đã được huỷ trước đó."
 #: model:ir.cron,name:isd_payment.cron_process_acb_webhook_queue
 msgid "ACB Webhook: Process Reconciliation"
 msgstr "ACB Webhook: Xử lý đối soát"
+
+#. module: isd_payment
+#: model:ir.cron,name:isd_payment.cron_process_acb_webhook_queue
+msgid "Payment Manager (by ISD)"
+msgstr "QL Thanh Toán (bởi ISD)"
