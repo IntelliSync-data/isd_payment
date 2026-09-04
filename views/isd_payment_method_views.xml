@@ -173,10 +173,10 @@
                 <field name="transaction_count"/>
                 <field name="pending_transaction_count"/>
                 <field name="confirmed_transaction_count"/>
-                <button name="action_view_transactions" type="object" icon="fa-money" string="" class="btn-link" title="View Transactions"/>
                 <field name="is_configured" widget="boolean_toggle"/>
                 <field name="active" widget="boolean_toggle"/>
                 <field name="company_id" groups="base.group_multi_company"/>
+                <button name="action_view_transactions" type="object" string="View Transactions" class="btn-link"/>
             </list>
         </field>
     </record>

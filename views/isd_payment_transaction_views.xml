@@ -193,7 +193,7 @@
         <field name="name">Transactions</field>
         <field name="res_model">isd_payment.transaction</field>
         <field name="view_mode">list,form,pivot,graph</field>
-        <field name="context">{'search_default_today': 1}</field>
+        <field name="context">{'search_default_status_confirmed': 1, 'search_default_group_branch': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_empty_folder">
                 No transactions yet
