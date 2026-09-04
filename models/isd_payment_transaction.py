@@ -65,6 +65,7 @@ class IsdPaymentTransaction(models.Model):
     )
     branch = fields.Char(
         string='Branch',
+        default='(Empty)',
         help='Branch or machine identifier (e.g., Phan Thiet - May 1)'
     )
 
