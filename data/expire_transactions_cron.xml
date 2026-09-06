@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="cron_expire_old_transactions" model="ir.cron">
+        <field name="name">ISD Payment: Expire Old Transactions</field>
+        <field name="model_id" ref="model_isd_payment_transaction"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_expire_old_transactions()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="numbercall">-1</field>
+        <field name="active">True</field>
+    </record>
+</odoo>

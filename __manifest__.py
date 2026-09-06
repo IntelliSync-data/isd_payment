@@ -52,6 +52,7 @@ Use Cases:
         'views/isd_payment_menu.xml',
         'data/paypal_default_data.xml',
         'data/acb_webhook_cron.xml',
+        'data/expire_transactions_cron.xml',
     ],
     'assets': {
         'web.assets_backend': [

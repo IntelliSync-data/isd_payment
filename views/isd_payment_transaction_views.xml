@@ -6,7 +6,7 @@
         <field name="name">isd_payment.transaction.form</field>
         <field name="model">isd_payment.transaction</field>
         <field name="arch" type="xml">
-            <form string="Payment Transaction" create="false" edit="false" delete="false">
+            <form string="Payment Transaction" create="false" delete="false">
                 <header>
                     <field name="status" widget="statusbar" statusbar_visible="pending,processing,confirmed"/>
                 </header>
@@ -18,17 +18,18 @@
                     </div>
                     <group>
                         <group>
-                            <field name="payment_method_id"/>
-                            <field name="amount" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                            <field name="payment_method_id" readonly="1"/>
+                            <field name="amount" widget="monetary" options="{'currency_field': 'currency_id'}" readonly="1"/>
                             <field name="currency_id" invisible="1"/>
-                            <field name="description"/>
-                            <field name="branch"/>
+                            <field name="description" readonly="1"/>
+                            <field name="branch" readonly="1"/>
+                            <field name="status"/>
                         </group>
                         <group>
-                            <field name="user_id"/>
-                            <field name="create_date" string="Created At"/>
-                            <field name="confirmed_at"/>
-                            <field name="expired_at"/>
+                            <field name="user_id" readonly="1"/>
+                            <field name="create_date" string="Created At" readonly="1"/>
+                            <field name="confirmed_at" readonly="1"/>
+                            <field name="expired_at" readonly="1"/>
                             <field name="is_expired" invisible="1"/>
                         </group>
                     </group>
@@ -41,8 +42,8 @@
                                     <field name="qr_url" invisible="1"/>
                                 </group>
                                 <group string="Bank Details">
-                                    <field name="bank_code"/>
-                                    <field name="bank_account"/>
+                                    <field name="bank_code" readonly="1"/>
+                                    <field name="bank_account" readonly="1"/>
                                 </group>
                             </group>
                         </page>
@@ -75,7 +76,7 @@
                         <page string="Reconciliation" name="reconciliation_info">
                             <group>
                                 <group>
-                                    <field name="reconciliation_status" widget="badge" decoration-success="reconciliation_status == 'matched'" decoration-info="reconciliation_status == 'waiting'" decoration-warning="reconciliation_status in ('updated', 'bank_data')" decoration-danger="reconciliation_status == 'review'"/>
+                                    <field name="reconciliation_status"/>
                                 </group>
                             </group>
                             <group string="Reconciliation Data (JSON)" invisible="reconciliation_status == 'waiting'">
