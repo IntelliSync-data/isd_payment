@@ -600,12 +600,14 @@ class IsdPaymentTransaction(models.Model):
     def mark_as_processing(self):
         """Mark transaction as processing"""
         self.ensure_one()
-        self.write({'status': 'processing'})
+        if self.status != 'processing':
+            self.write({'status': 'processing'})
 
     def mark_as_expired(self):
         """Mark transaction as expired"""
         self.ensure_one()
-        self.write({'status': 'expired'})
+        if self.status != 'expired':
+            self.write({'status': 'expired'})
 
     @api.model
     def cron_expire_old_transactions(self):

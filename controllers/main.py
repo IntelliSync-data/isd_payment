@@ -1117,8 +1117,9 @@ class IsdPaymentController(http.Controller):
                 }
 
             # Check if expired
-            if transaction.is_expired:
-                transaction.mark_as_expired()
+            if transaction.is_expired or transaction.status == 'expired':
+                if transaction.status != 'expired':
+                    transaction.mark_as_expired()
                 return {
                     'success': False,
                     'status': 'expired',
