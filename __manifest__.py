@@ -50,7 +50,6 @@ Use Cases:
         'wizard/api_documentation_wizard_views.xml',
         'wizard/acb_transaction_wizard_views.xml',
         'views/isd_payment_menu.xml',
-        'data/paypal_default_data.xml',
         'data/acb_webhook_cron.xml',
         'data/expire_transactions_cron.xml',
     ],

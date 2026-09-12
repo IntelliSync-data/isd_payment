@@ -2,7 +2,6 @@
 
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
-from datetime import timedelta, datetime
 import json
 import logging
 
@@ -110,18 +109,7 @@ class IsdPaymentWebhookLog(models.Model):
         payment_method = self.payment_method_id
         processed_count = 0
 
-        # Determine the reconciliation date from the first transaction's effectiveDate
-        # Only query transactions from that date range (T-1)
-        first_effective = transactions[0].get('effectiveDate', '')
-        if first_effective:
-            recon_date = datetime.strptime(first_effective, '%Y-%m-%d').date()
-        else:
-            recon_date = (datetime.now() - timedelta(days=1)).date()
-
-        recon_date_start = datetime.combine(recon_date, datetime.min.time())
-        recon_date_end = datetime.combine(recon_date + timedelta(days=1), datetime.min.time())
-
-        _logger.info(f"Webhook log {self.id}: processing {len(transactions)} transactions for date {recon_date}")
+        _logger.info(f"Webhook log {self.id}: processing {len(transactions)} transactions")
 
         # Filter transactions by merchant identity (custom1/custom2 must match payment method config)
         merchant_ids = set(filter(None, [
@@ -171,30 +159,18 @@ class IsdPaymentWebhookLog(models.Model):
                 transaction = Transaction.search([
                     ('acb_trace_number', '=', trace_number),
                     ('payment_method_id', '=', payment_method.id),
-                    ('create_date', '>=', recon_date_start),
-                    ('create_date', '<', recon_date_end),
                 ], limit=1)
-                # Fallback: search without date filter (in case transaction was created earlier)
-                if not transaction:
-                    transaction = Transaction.search([
-                        ('acb_trace_number', '=', trace_number),
-                        ('payment_method_id', '=', payment_method.id),
-                    ], limit=1)
 
             if not transaction and virtual_account:
                 transaction = Transaction.search([
                     ('acb_virtual_account', '=', virtual_account),
                     ('payment_method_id', '=', payment_method.id),
-                    ('create_date', '>=', recon_date_start),
-                    ('create_date', '<', recon_date_end),
                 ], limit=1)
 
             if not transaction and reference_number:
                 transaction = Transaction.search([
                     ('transaction_id', '=', reference_number),
                     ('payment_method_id', '=', payment_method.id),
-                    ('create_date', '>=', recon_date_start),
-                    ('create_date', '<', recon_date_end),
                 ], limit=1)
 
             if not transaction:
