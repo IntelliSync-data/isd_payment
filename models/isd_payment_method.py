@@ -338,6 +338,7 @@ class IsdPaymentMethod(models.Model):
             'context': {
                 'default_payment_method_id': self.id,
                 'search_default_status_confirmed': 1,
+                'search_default_today': 1,
                 'search_default_group_branch': 1,
             },
         }
