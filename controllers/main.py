@@ -387,10 +387,13 @@ class IsdPaymentController(http.Controller):
         """Build a VNPay hosted-checkout payment URL"""
         try:
             import urllib.parse
+            import pytz
             from datetime import datetime as dt
 
-            request_ip = request.httprequest.remote_addr or '127.0.0.1'
-            now = dt.now()
+            forwarded = request.httprequest.headers.get('X-Forwarded-For', '')
+            request_ip = forwarded.split(',')[0].strip() if forwarded else (request.httprequest.remote_addr or '127.0.0.1')
+            # VNPay requires GMT+7; Odoo servers run in UTC, so naive now() makes the order look already expired
+            now = dt.now(pytz.timezone('Asia/Ho_Chi_Minh'))
             order_info = self._sanitize_vnpay_order_info(description) or f'Thanh toan {transaction_id}'
 
             params = {
