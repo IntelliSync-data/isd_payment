@@ -43,7 +43,7 @@ class IsdPaymentMethod(models.Model):
 
     # Provider
     payment_provider = fields.Selection(
-        [('sepay', 'SePay'), ('paypal', 'PayPal'), ('vtcpay', 'VTC Pay'), ('acbpay', 'ACB Pay')],
+        [('sepay', 'SePay'), ('paypal', 'PayPal'), ('vtcpay', 'VTC Pay'), ('acbpay', 'ACB Pay'), ('vnpay', 'VNPay')],
         string='Payment Provider',
         required=True,
         default='sepay',
@@ -63,11 +63,11 @@ class IsdPaymentMethod(models.Model):
     )
     provider_account_id = fields.Char(
         string='Account ID',
-        help='SePay: bank account number | PayPal: Client ID'
+        help='SePay: bank account number | PayPal: Client ID | VNPay: TMN Code'
     )
     provider_secret = fields.Char(
         string='Secret / Token',
-        help='SePay: API token | PayPal: Client Secret'
+        help='SePay: API token | PayPal: Client Secret | VNPay: Hash Secret'
     )
 
     # SePay-specific Configuration
@@ -140,6 +140,24 @@ class IsdPaymentMethod(models.Model):
     acb_user_id = fields.Char(
         string='User ID',
         help='ACB user ID (userId) for QR payment API'
+    )
+
+    # VNPay-specific Configuration
+    vnpay_locale = fields.Selection(
+        [('vn', 'Vietnamese'), ('en', 'English')],
+        string='Locale',
+        default='vn',
+        help='Language of the VNPay checkout page'
+    )
+    vnpay_bank_code = fields.Char(
+        string='Bank Code',
+        help='Force a specific payment method: VNPAYQR (QR code), VNBANK (domestic ATM card), '
+             'INTCARD (international Visa/Mastercard/JCB). Leave empty to let customer choose on VNPay page.'
+    )
+    vnpay_order_type = fields.Char(
+        string='Order Type',
+        default='other',
+        help='VNPay merchandise category code (default: other)'
     )
 
     # PayPal-specific Configuration
@@ -237,6 +255,12 @@ class IsdPaymentMethod(models.Model):
                     record.acb_account_number,
                     record.acb_merchant_id,
                     record.acb_terminal_id,
+                ])
+            elif record.payment_provider == 'vnpay':
+                record.is_configured = all([
+                    record.provider_host,
+                    record.provider_account_id,
+                    record.provider_secret,
                 ])
             else:  # sepay
                 record.is_configured = all([

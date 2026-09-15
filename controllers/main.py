@@ -345,6 +345,94 @@ class IsdPaymentController(http.Controller):
         return f"{token_type} {access_token}"
 
     # ==========================================
+    # VNPay Methods
+    # ==========================================
+
+    def _vnpay_hmac(self, payment_method, params):
+        """Build VNPay secure hash (HMAC-SHA512) from a params dict.
+
+        VNPay's algorithm: drop empty values and vnp_SecureHash(Type),
+        sort remaining keys alphabetically, build a query string with
+        percent-encoded values (space -> '+'), then HMAC-SHA512 with
+        the merchant's hash secret.
+        """
+        import hashlib
+        import hmac
+        import urllib.parse
+
+        clean = {
+            k: v for k, v in params.items()
+            if v not in (None, '') and k not in ('vnp_SecureHash', 'vnp_SecureHashType')
+        }
+        sorted_keys = sorted(clean.keys())
+        hash_data = '&'.join(
+            f"{k}={urllib.parse.quote_plus(str(clean[k]))}" for k in sorted_keys
+        )
+        secret = (payment_method.provider_secret or '').encode()
+        signed = hmac.new(secret, hash_data.encode(), hashlib.sha512).hexdigest()
+        return signed, hash_data
+
+    def _sanitize_vnpay_order_info(self, text):
+        """Strip Vietnamese diacritics and any character outside [A-Za-z0-9 ] so the
+        value encodes identically under VNPay's encodeURIComponent-based hashing and
+        our urllib quote_plus-based hashing (they diverge on a few punctuation chars).
+        """
+        text = unicodedata.normalize('NFD', text)
+        text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+        text = text.replace('đ', 'd').replace('Đ', 'D')
+        text = re.sub(r'[^A-Za-z0-9 ]', ' ', text)
+        return re.sub(r'\s+', ' ', text).strip()
+
+    def _create_vnpay_payment(self, payment_method, amount, transaction_id, description='', return_url=''):
+        """Build a VNPay hosted-checkout payment URL"""
+        try:
+            import urllib.parse
+            from datetime import datetime as dt
+
+            request_ip = request.httprequest.remote_addr or '127.0.0.1'
+            now = dt.now()
+            order_info = self._sanitize_vnpay_order_info(description) or f'Thanh toan {transaction_id}'
+
+            params = {
+                'vnp_Version': '2.1.0',
+                'vnp_Command': 'pay',
+                'vnp_TmnCode': payment_method.provider_account_id,
+                'vnp_Amount': str(int(round(amount)) * 100),
+                'vnp_CurrCode': 'VND',
+                'vnp_TxnRef': transaction_id,
+                'vnp_OrderInfo': order_info,
+                'vnp_OrderType': payment_method.vnpay_order_type or 'other',
+                'vnp_Locale': payment_method.vnpay_locale or 'vn',
+                'vnp_ReturnUrl': return_url,
+                'vnp_IpAddr': request_ip,
+                'vnp_CreateDate': now.strftime('%Y%m%d%H%M%S'),
+                'vnp_ExpireDate': (now + timedelta(minutes=15)).strftime('%Y%m%d%H%M%S'),
+            }
+            if payment_method.vnpay_bank_code:
+                params['vnp_BankCode'] = payment_method.vnpay_bank_code
+
+            secure_hash, _ = self._vnpay_hmac(payment_method, params)
+            params['vnp_SecureHash'] = secure_hash
+
+            query = '&'.join(f"{k}={urllib.parse.quote_plus(str(v))}" for k, v in params.items())
+            pay_url = f"{payment_method.provider_host}?{query}"
+
+            return {'found': True, 'redirect_url': pay_url}
+        except Exception as e:
+            _logger.exception("Error creating VNPay payment")
+            return {'found': False, 'message': str(e)}
+
+    def _verify_vnpay_response(self, payment_method, params):
+        """Verify a VNPay return/IPN response signature. Returns True/False."""
+        import hmac as hmac_lib
+
+        received_hash = params.get('vnp_SecureHash', '')
+        if not received_hash:
+            return False
+        calc_hash, _ = self._vnpay_hmac(payment_method, params)
+        return hmac_lib.compare_digest(received_hash.lower(), calc_hash.lower())
+
+    # ==========================================
     # ACB Pay Methods
     # ==========================================
 
@@ -833,6 +921,106 @@ class IsdPaymentController(http.Controller):
                 status=200,
             )
 
+    @http.route('/isd_payment/vnpay/ipn', type='http', auth='public', methods=['GET'], csrf=False)
+    def vnpay_ipn(self, **kwargs):
+        """
+        VNPay IPN (Instant Payment Notification) — server-to-server callback.
+        Configure this URL in the VNPay merchant portal (one URL per merchant profile).
+        Must respond with VNPay's expected JSON schema.
+        """
+        def _ipn_response(code, message):
+            return self._json_response({'RspCode': code, 'Message': message})
+
+        try:
+            params = dict(kwargs)
+            _logger.info(f"[VNPay IPN] received: {params}")
+
+            txn_ref = params.get('vnp_TxnRef', '')
+            transaction = request.env['isd_payment.transaction'].sudo().search([
+                ('transaction_id', '=', txn_ref),
+            ], limit=1)
+            if not transaction:
+                return _ipn_response('01', 'Order not found')
+
+            payment_method = transaction.payment_method_id
+            if not self._verify_vnpay_response(payment_method, params):
+                _logger.warning(f"[VNPay IPN] invalid signature for {txn_ref}")
+                return _ipn_response('97', 'Checksum failed')
+
+            vnp_amount = int(params.get('vnp_Amount', 0)) / 100
+            if int(vnp_amount) != int(transaction.amount):
+                return _ipn_response('04', 'invalid amount')
+
+            if transaction.status == 'confirmed':
+                return _ipn_response('02', 'Order already confirmed')
+
+            response_code = params.get('vnp_ResponseCode', '')
+            vnpay_data = {
+                'transaction_no': params.get('vnp_TransactionNo'),
+                'bank_code': params.get('vnp_BankCode'),
+                'card_type': params.get('vnp_CardType'),
+                'response_code': response_code,
+                'pay_date': params.get('vnp_PayDate'),
+            }
+
+            if response_code == '00':
+                transaction.mark_as_confirmed_vnpay(vnpay_data)
+                _logger.info(f"[VNPay IPN] confirmed transaction {txn_ref}")
+            else:
+                transaction.write({
+                    'status': 'failed',
+                    'vnpay_response_code': response_code,
+                    'vnpay_bank_code': params.get('vnp_BankCode'),
+                })
+                _logger.info(f"[VNPay IPN] transaction {txn_ref} failed, code={response_code}")
+
+            return _ipn_response('00', 'Confirm Success')
+
+        except Exception as e:
+            _logger.exception("[VNPay IPN] Error processing IPN")
+            return _ipn_response('99', 'Unknown error')
+
+    @http.route('/isd_payment/vnpay/return', type='http', auth='public', methods=['GET'], csrf=False)
+    def vnpay_return(self, **kwargs):
+        """
+        Fallback landing page after the customer finishes on VNPay's checkout page.
+        Used only if the caller of /create did not pass its own return_url.
+        The IPN callback above is the authoritative confirmation path; this page
+        also opportunistically confirms so the customer sees an instant result
+        even if IPN is delayed.
+        """
+        params = dict(kwargs)
+        txn_ref = params.get('vnp_TxnRef', '')
+        response_code = params.get('vnp_ResponseCode', '')
+
+        transaction = request.env['isd_payment.transaction'].sudo().search([
+            ('transaction_id', '=', txn_ref),
+        ], limit=1)
+
+        success = False
+        if transaction and self._verify_vnpay_response(transaction.payment_method_id, params):
+            if transaction.status != 'confirmed' and response_code == '00':
+                transaction.mark_as_confirmed_vnpay({
+                    'transaction_no': params.get('vnp_TransactionNo'),
+                    'bank_code': params.get('vnp_BankCode'),
+                    'card_type': params.get('vnp_CardType'),
+                    'response_code': response_code,
+                    'pay_date': params.get('vnp_PayDate'),
+                })
+            success = transaction.status == 'confirmed'
+
+        title = 'Payment Successful' if success else 'Payment Failed'
+        color = '#28a745' if success else '#dc3545'
+        html = f"""
+        <html><head><meta charset="utf-8"><title>{title}</title></head>
+        <body style="font-family:sans-serif;text-align:center;padding-top:80px;">
+            <h1 style="color:{color};">{title}</h1>
+            <p>Transaction: {txn_ref or 'N/A'}</p>
+            <p>You may close this window.</p>
+        </body></html>
+        """
+        return Response(html, content_type='text/html')
+
     # ==========================================
     # API Endpoint 1: Create Payment
     # ==========================================
@@ -1000,6 +1188,46 @@ class IsdPaymentController(http.Controller):
                     }
                 }
 
+            elif payment_method.payment_provider == 'vnpay':
+                # VNPay: redirect customer to VNPay hosted checkout (accepts Visa/Mastercard/JCB + domestic ATM)
+                transaction_id = request.env['isd_payment.transaction'].sudo().generate_transaction_id(
+                    payment_method.prefix
+                )
+                base_url = request.env['ir.config_parameter'].sudo().get_param('web.base.url')
+                return_url = kwargs.get('return_url') or f"{base_url}/isd_payment/vnpay/return"
+
+                vnpay_result = self._create_vnpay_payment(
+                    payment_method, amount, transaction_id, description, return_url
+                )
+                if not vnpay_result.get('found'):
+                    return {
+                        'success': False,
+                        'error': vnpay_result.get('message', 'VNPay error'),
+                        'error_code': 'VNPAY_ERROR'
+                    }
+
+                transaction = request.env['isd_payment.transaction'].sudo().create({
+                    'payment_method_id': payment_method.id,
+                    'transaction_id': transaction_id,
+                    'amount': amount,
+                    'description': description,
+                    'branch': branch,
+                    'vnpay_redirect_url': vnpay_result.get('redirect_url'),
+                    'status': 'pending',
+                    'request_origin': request_origin,
+                    'request_ip': request_ip,
+                })
+
+                return {
+                    'success': True,
+                    'data': {
+                        'transaction_id': transaction_id,
+                        'redirect_url': vnpay_result.get('redirect_url'),
+                        'amount': amount,
+                        'created_at': transaction.create_date.strftime('%Y-%m-%d %H:%M:%S') if transaction.create_date else None,
+                    }
+                }
+
             else:
                 # SePay: generate QR code
                 transaction_id = request.env['isd_payment.transaction'].sudo().generate_transaction_id(
@@ -1147,6 +1375,36 @@ class IsdPaymentController(http.Controller):
                         'success': True,
                         'status': 'pending',
                         'message': 'Waiting for payment confirmation from ACB',
+                    }
+
+            if payment_method.payment_provider == 'vnpay':
+                # VNPay: check DB only (payment confirmation comes via IPN/return callback, no DB update here)
+                if transaction.status == 'confirmed':
+                    return {
+                        'success': True,
+                        'status': 'confirmed',
+                        'message': 'Payment confirmed via VNPay',
+                        'data': {
+                            'transaction_id': transaction.transaction_id,
+                            'amount': transaction.amount,
+                            'confirmed_at': transaction.confirmed_at.strftime('%Y-%m-%d %H:%M:%S') if transaction.confirmed_at else None,
+                            'vnpay_transaction_no': transaction.vnpay_transaction_no,
+                            'vnpay_bank_code': transaction.vnpay_bank_code,
+                            'vnpay_card_type': transaction.vnpay_card_type,
+                        }
+                    }
+                elif transaction.status == 'failed':
+                    return {
+                        'success': False,
+                        'status': 'failed',
+                        'message': f'Payment failed (VNPay response code: {transaction.vnpay_response_code})',
+                        'error_code': 'VNPAY_FAILED'
+                    }
+                else:
+                    return {
+                        'success': True,
+                        'status': 'pending',
+                        'message': 'Waiting for payment confirmation from VNPay',
                     }
 
             # Non-ACB providers: mark as processing and poll

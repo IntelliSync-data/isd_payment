@@ -92,6 +92,10 @@ class ApiDocumentationWizard(models.TransientModel):
                 wizard.api_documentation = self._generate_acbpay_docs(method, base_url)
                 continue
 
+            if method.payment_provider == 'vnpay':
+                wizard.api_documentation = self._generate_vnpay_docs(method, base_url)
+                continue
+
             html = f'''
             <div class="api-documentation">
                 <style>
@@ -703,6 +707,164 @@ window.location.href = data.result.data.redirect_url;</pre></div>
                     <li><code>PAYPAL_ERROR</code>: PayPal API returned an error</li>
                     <li><code>TRANSACTION_NOT_FOUND</code>: Transaction doesn't exist</li>
                     <li><code>TRANSACTION_EXPIRED</code>: Transaction expired (&gt;1 hour)</li>
+                    <li><code>INTERNAL_ERROR</code>: Server error</li>
+                </ul>
+            </div>
+        </div>
+        '''
+
+    def _generate_vnpay_docs(self, method, base_url):
+        """Generate VNPay-specific API documentation"""
+        webhook_base = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+        return f'''
+        <div class="api-documentation">
+            <style>
+                .api-documentation {{ font-family: 'Courier New', monospace; font-size: 13px; }}
+                .api-section {{ background: #f8f9fa; border-left: 4px solid #005baa; padding: 15px; margin: 20px 0; }}
+                .api-method {{ color: white; padding: 4px 12px; border-radius: 4px; display: inline-block; margin-right: 8px; font-weight: bold; font-size: 13px; letter-spacing: 0.5px; vertical-align: middle; }}
+                .api-method-post {{ background: #49cc90; }}
+                .api-method-get {{ background: #61affe; }}
+                .api-url {{ background: #e9ecef; padding: 5px 10px; border-radius: 3px; display: inline-block; font-family: monospace; }}
+                .code-block {{ background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow-x: auto; margin: 10px 0; }}
+                .code-block pre {{ margin: 0; white-space: pre-wrap; }}
+                .api-description {{ color: #6c757d; margin: 10px 0; }}
+                h3 {{ color: #005baa; border-bottom: 2px solid #005baa; padding-bottom: 5px; }}
+                h4 {{ color: #0077cc; margin-top: 15px; }}
+            </style>
+
+            <h2>API Documentation - {method.name} (VNPay)</h2>
+
+            <div style="background: #e7f0ff; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <p><b>Base URL:</b> <code>{base_url}</code></p>
+                <p><b>Provider:</b> VNPay</p>
+                <p><b>VNPay Host:</b> {method.provider_host or 'N/A'}</p>
+                <p><b>TMN Code:</b> {method.provider_account_id or 'N/A'}</p>
+                <p><b>Locale:</b> {method.vnpay_locale or 'vn'}</p>
+                <p><b>Bank Code Override:</b> {method.vnpay_bank_code or '(customer chooses on VNPay page)'}</p>
+                <p><b>CORS:</b> {'Enabled' if method.enable_cors else 'Disabled (Public API)'}</p>
+            </div>
+
+            <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h4>VNPay Payment Flow</h4>
+                <ol>
+                    <li>Call <b>/create</b> → get <code>redirect_url</code> and <code>transaction_id</code></li>
+                    <li>Redirect user's browser to <code>redirect_url</code> (VNPay hosted checkout: QR / domestic ATM / international Visa-Mastercard-JCB)</li>
+                    <li>VNPay redirects the browser back to your <code>return_url</code> (or a built-in fallback page) after payment</li>
+                    <li>VNPay also calls the server-to-server IPN URL below — this is the authoritative confirmation</li>
+                    <li>Poll <b>/confirm</b> or <b>/transaction/&#123;id&#125;</b> from your frontend to read the confirmed status</li>
+                </ol>
+                <p><small>Amount is always VND. VNPay/the customer's card network handles any foreign-currency conversion on the customer's side — you never touch other currencies.</small></p>
+            </div>
+
+            <div style="background: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h4>⚠️ Required: Configure IPN URL in VNPay Merchant Portal</h4>
+                <p>VNPay only calls ONE global IPN URL per merchant profile (set once in their portal, not per-request):</p>
+                <p class="api-url">{webhook_base}/isd_payment/vnpay/ipn</p>
+            </div>
+
+            <!-- API 1: Create Payment -->
+            <div class="api-section">
+                <h3>1. Create Payment (Get VNPay Redirect URL)</h3>
+                <p><span class="api-method api-method-post">POST</span><span class="api-url">{base_url}/create</span></p>
+                <p class="api-description">Build a signed VNPay checkout URL. Optionally pass <code>return_url</code> to control where the customer lands after paying (defaults to a built-in Odoo page).</p>
+
+                <h4>Request Body (JSON-RPC):</h4>
+                <div class="code-block"><pre>{{
+  "jsonrpc": "2.0",
+  "method": "call",
+  "params": {{
+    "amount": 500000,
+    "description": "Order 12345",
+    "branch": "Phan Thiet - May 1",
+    "return_url": "https://your-site.com/payment/return"
+  }}
+}}</pre></div>
+
+                <h4>Response:</h4>
+                <div class="code-block"><pre>{{
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {{
+    "success": true,
+    "data": {{
+      "transaction_id": "{method.prefix or 'PREFIX'}ABC1234567",
+      "redirect_url": "{method.provider_host or 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'}?vnp_Version=2.1.0&amp;...",
+      "amount": 500000,
+      "created_at": "2026-04-04 10:30:00"
+    }}
+  }}
+}}</pre></div>
+
+                <h4>JavaScript Example:</h4>
+                <div class="code-block"><pre>const res = await fetch('{base_url}/create', {{
+  method: 'POST',
+  headers: {{'Content-Type': 'application/json'}},
+  body: JSON.stringify({{
+    jsonrpc: '2.0', method: 'call',
+    params: {{amount: 500000, branch: 'Chi nhanh 1'}}
+  }})
+}});
+const data = await res.json();
+window.location.href = data.result.data.redirect_url;</pre></div>
+            </div>
+
+            <!-- API 2: Confirm Payment -->
+            <div class="api-section">
+                <h3>2. Confirm Payment (Read Status)</h3>
+                <p><span class="api-method api-method-post">POST</span><span class="api-url">{base_url}/confirm</span></p>
+                <p class="api-description">Reads the transaction status from the database. The IPN callback (above) is what actually confirms the payment — this endpoint does not call VNPay itself.</p>
+
+                <h4>Request Body (JSON-RPC):</h4>
+                <div class="code-block"><pre>{{
+  "jsonrpc": "2.0",
+  "method": "call",
+  "params": {{
+    "transaction_id": "{method.prefix or 'PREFIX'}ABC1234567",
+    "amount": 500000
+  }}
+}}</pre></div>
+
+                <h4>Response (Confirmed):</h4>
+                <div class="code-block"><pre>{{
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {{
+    "success": true,
+    "status": "confirmed",
+    "message": "Payment confirmed via VNPay",
+    "data": {{
+      "transaction_id": "{method.prefix or 'PREFIX'}ABC1234567",
+      "amount": 500000,
+      "confirmed_at": "2026-04-04 10:35:00",
+      "vnpay_transaction_no": "14567890",
+      "vnpay_bank_code": "NCB",
+      "vnpay_card_type": "ATM"
+    }}
+  }}
+}}</pre></div>
+            </div>
+
+            <!-- API 3: Get Transaction -->
+            <div class="api-section">
+                <h3>3. Get Transaction Status</h3>
+                <p><span class="api-method api-method-get">GET</span><span class="api-url">{base_url}/transaction/{{transaction_id}}</span></p>
+                <p class="api-description">Get current status of a transaction.</p>
+
+                <h4>cURL Example:</h4>
+                <div class="code-block"><pre>curl -X GET {base_url}/transaction/{method.prefix or 'PREFIX'}ABC1234567</pre></div>
+            </div>
+
+            <!-- Error Codes -->
+            <div class="api-section">
+                <h3>Error Codes</h3>
+                <ul>
+                    <li><code>METHOD_NOT_FOUND</code>: Payment method not found or inactive</li>
+                    <li><code>CORS_BLOCKED</code>: Origin not allowed</li>
+                    <li><code>INVALID_AMOUNT</code>: Amount validation failed</li>
+                    <li><code>VNPAY_ERROR</code>: Error building the VNPay redirect URL</li>
+                    <li><code>VNPAY_FAILED</code>: VNPay reported a failed transaction (see <code>vnpay_response_code</code>)</li>
+                    <li><code>TRANSACTION_NOT_FOUND</code>: Transaction doesn't exist</li>
+                    <li><code>TRANSACTION_EXPIRED</code>: Transaction expired (&gt;15 min for VNPay)</li>
                     <li><code>INTERNAL_ERROR</code>: Server error</li>
                 </ul>
             </div>

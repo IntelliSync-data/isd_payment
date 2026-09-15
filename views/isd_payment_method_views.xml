@@ -60,9 +60,9 @@
                             <!-- Shared fields -->
                             <group>
                                 <group string="Connection">
-                                    <field name="provider_host" placeholder="https://my.sepay.vn  or  https://api-m.sandbox.paypal.com"/>
-                                    <field name="provider_account_id" placeholder="SePay: account number | PayPal: Client ID"/>
-                                    <field name="provider_secret" password="True" placeholder="SePay: API token | PayPal: Client Secret"/>
+                                    <field name="provider_host" placeholder="https://my.sepay.vn | https://api-m.sandbox.paypal.com | https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"/>
+                                    <field name="provider_account_id" placeholder="SePay: account number | PayPal: Client ID | VNPay: TMN Code"/>
+                                    <field name="provider_secret" password="True" placeholder="SePay: API token | PayPal: Client Secret | VNPay: Hash Secret"/>
                                 </group>
                             </group>
 
@@ -88,6 +88,15 @@
                                     <field name="vtc_security_code" password="True" placeholder="Security Code"/>
                                     <field name="vtc_receiver_account" placeholder="Receiver Account"/>
                                     <field name="vtc_payment_type" placeholder="DomesticBank"/>
+                                </group>
+                            </group>
+
+                            <!-- VNPay-specific fields -->
+                            <group invisible="payment_provider != 'vnpay'">
+                                <group string="VNPay Settings">
+                                    <field name="vnpay_locale" widget="radio"/>
+                                    <field name="vnpay_bank_code" placeholder="Leave empty to let customer choose (VNPAYQR / VNBANK / INTCARD)"/>
+                                    <field name="vnpay_order_type" placeholder="other"/>
                                 </group>
                             </group>
 

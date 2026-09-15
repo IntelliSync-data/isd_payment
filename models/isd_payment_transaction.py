@@ -148,6 +148,32 @@ class IsdPaymentTransaction(models.Model):
         help='Raw QR data from ACB response'
     )
 
+    # VNPay Response
+    vnpay_redirect_url = fields.Char(
+        string='VNPay Redirect URL',
+        help='URL to redirect user to VNPay checkout page'
+    )
+    vnpay_transaction_no = fields.Char(
+        string='VNPay Transaction No',
+        help='Transaction number from VNPay (vnp_TransactionNo)'
+    )
+    vnpay_bank_code = fields.Char(
+        string='VNPay Bank Code',
+        help='Bank/card type used by customer (vnp_BankCode)'
+    )
+    vnpay_card_type = fields.Char(
+        string='VNPay Card Type',
+        help='Payment method used: ATM, QRCODE, INTCARD, etc. (vnp_CardType)'
+    )
+    vnpay_response_code = fields.Char(
+        string='VNPay Response Code',
+        help='Response code from VNPay (00 = success)'
+    )
+    vnpay_pay_date = fields.Char(
+        string='VNPay Pay Date',
+        help='Raw payment timestamp from VNPay (yyyyMMddHHmmss)'
+    )
+
     # Reconciliation
     reconciliation_status = fields.Selection([
         ('waiting', 'Waiting'),
@@ -297,6 +323,23 @@ class IsdPaymentTransaction(models.Model):
                 'paypal_order_id': paypal_data.get('order_id'),
                 'paypal_capture_id': paypal_data.get('capture_id'),
                 'paypal_payer_email': paypal_data.get('payer_email'),
+            })
+        self.write(vals)
+
+    def mark_as_confirmed_vnpay(self, vnpay_data=None):
+        """Mark transaction as confirmed (VNPay)"""
+        self.ensure_one()
+        vals = {
+            'status': 'confirmed',
+            'confirmed_at': fields.Datetime.now(),
+        }
+        if vnpay_data:
+            vals.update({
+                'vnpay_transaction_no': vnpay_data.get('transaction_no'),
+                'vnpay_bank_code': vnpay_data.get('bank_code'),
+                'vnpay_card_type': vnpay_data.get('card_type'),
+                'vnpay_response_code': vnpay_data.get('response_code'),
+                'vnpay_pay_date': vnpay_data.get('pay_date'),
             })
         self.write(vals)
 

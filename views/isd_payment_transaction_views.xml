@@ -73,6 +73,21 @@
                             </group>
                         </page>
 
+                        <page string="VNPay Response" name="vnpay_response" invisible="not vnpay_redirect_url">
+                            <group>
+                                <group>
+                                    <field name="vnpay_transaction_no"/>
+                                    <field name="vnpay_response_code"/>
+                                    <field name="vnpay_pay_date"/>
+                                </group>
+                                <group>
+                                    <field name="vnpay_bank_code"/>
+                                    <field name="vnpay_card_type"/>
+                                    <field name="vnpay_redirect_url" widget="url"/>
+                                </group>
+                            </group>
+                        </page>
+
                         <page string="Reconciliation" name="reconciliation_info">
                             <group>
                                 <group>
