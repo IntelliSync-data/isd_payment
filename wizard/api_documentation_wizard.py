@@ -96,6 +96,10 @@ class ApiDocumentationWizard(models.TransientModel):
                 wizard.api_documentation = self._generate_vnpay_docs(method, base_url)
                 continue
 
+            if method.payment_provider == 'cash':
+                wizard.api_documentation = self._generate_cash_docs(method, base_url)
+                continue
+
             html = f'''
             <div class="api-documentation">
                 <style>
@@ -705,6 +709,158 @@ window.location.href = data.result.data.redirect_url;</pre></div>
                     <li><code>CORS_BLOCKED</code>: Origin not allowed</li>
                     <li><code>INVALID_AMOUNT</code>: Amount validation failed</li>
                     <li><code>PAYPAL_ERROR</code>: PayPal API returned an error</li>
+                    <li><code>TRANSACTION_NOT_FOUND</code>: Transaction doesn't exist</li>
+                    <li><code>TRANSACTION_EXPIRED</code>: Transaction expired (&gt;1 hour)</li>
+                    <li><code>INTERNAL_ERROR</code>: Server error</li>
+                </ul>
+            </div>
+        </div>
+        '''
+
+    def _generate_cash_docs(self, method, base_url):
+        """Generate Cash-specific API documentation"""
+        prefix = method.prefix or 'PREFIX'
+        return f'''
+        <div class="api-documentation">
+            <style>
+                .api-documentation {{ font-family: 'Courier New', monospace; font-size: 13px; }}
+                .api-section {{ background: #f8f9fa; border-left: 4px solid #2e7d32; padding: 15px; margin: 20px 0; }}
+                .api-method {{ color: white; padding: 4px 12px; border-radius: 4px; display: inline-block; margin-right: 8px; font-weight: bold; font-size: 13px; letter-spacing: 0.5px; vertical-align: middle; }}
+                .api-method-post {{ background: #49cc90; }}
+                .api-method-get {{ background: #61affe; }}
+                .api-url {{ background: #e9ecef; padding: 5px 10px; border-radius: 3px; display: inline-block; font-family: monospace; }}
+                .code-block {{ background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow-x: auto; margin: 10px 0; }}
+                .code-block pre {{ margin: 0; white-space: pre-wrap; }}
+                .api-description {{ color: #6c757d; margin: 10px 0; }}
+                h3 {{ color: #2e7d32; border-bottom: 2px solid #2e7d32; padding-bottom: 5px; }}
+                h4 {{ color: #388e3c; margin-top: 15px; }}
+            </style>
+
+            <h2>API Documentation - {method.name} (Cash)</h2>
+
+            <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <p><b>Base URL:</b> <code>{base_url}</code></p>
+                <p><b>Provider:</b> Cash (paid by hand)</p>
+                <p><b>Prefix:</b> {prefix}</p>
+                <p><b>CORS:</b> {'Enabled' if method.enable_cors else 'Disabled (Public API)'}</p>
+                <p><small>Cash needs no host, no Client ID and no Secret. Nothing is sent to any payment gateway.</small></p>
+            </div>
+
+            <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h4>Cash Payment Flow</h4>
+                <ol>
+                    <li>Call <b>/create</b> → a transaction is recorded with status <code>pending</code> (no QR code, no redirect URL)</li>
+                    <li>Staff receives the money by hand</li>
+                    <li>Confirm the payment in one of two ways:
+                        <ul>
+                            <li>Call <b>/confirm</b> with the same <code>amount</code> → status becomes <code>confirmed</code> immediately</li>
+                            <li>Or open the transaction in Odoo and click <b>Mark as Paid</b> (this also records who confirmed it)</li>
+                        </ul>
+                    </li>
+                </ol>
+                <p><small>A pending cash transaction still expires 1 hour after it is created, like every other provider.</small></p>
+            </div>
+
+            <!-- API 1: Create Payment -->
+            <div class="api-section">
+                <h3>1. Create Payment</h3>
+                <p><span class="api-method api-method-post">POST</span><span class="api-url">{base_url}/create</span></p>
+                <p class="api-description">Record a cash payment to be collected. Returns a transaction ID to confirm later.</p>
+
+                <h4>Request Body (JSON-RPC):</h4>
+                <div class="code-block"><pre>{{
+  "jsonrpc": "2.0",
+  "method": "call",
+  "params": {{
+    "amount": 500000,
+    "description": "Order 12345",
+    "branch": "Phan Thiet - May 1"
+  }}
+}}</pre></div>
+
+                <h4>Response:</h4>
+                <div class="code-block"><pre>{{
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {{
+    "success": true,
+    "data": {{
+      "transaction_id": "{prefix}ABC1234567",
+      "amount": 500000,
+      "status": "pending",
+      "created_at": "2026-04-04 10:30:00"
+    }}
+  }}
+}}</pre></div>
+
+                <h4>JavaScript Example:</h4>
+                <div class="code-block"><pre>const res = await fetch('{base_url}/create', {{
+  method: 'POST',
+  headers: {{ 'Content-Type': 'application/json' }},
+  body: JSON.stringify({{
+    jsonrpc: '2.0',
+    method: 'call',
+    params: {{ amount: 500000, description: 'Order 12345', branch: 'Phan Thiet - May 1' }}
+  }})
+}});
+const {{ result }} = await res.json();
+const transactionId = result.data.transaction_id;</pre></div>
+            </div>
+
+            <!-- API 2: Confirm Payment -->
+            <div class="api-section">
+                <h3>2. Confirm Payment (Cash Received)</h3>
+                <p><span class="api-method api-method-post">POST</span><span class="api-url">{base_url}/confirm</span></p>
+                <p class="api-description">Call this once the staff has the money in hand. The amount must match the transaction amount.</p>
+
+                <h4>Request Body (JSON-RPC):</h4>
+                <div class="code-block"><pre>{{
+  "jsonrpc": "2.0",
+  "method": "call",
+  "params": {{
+    "transaction_id": "{prefix}ABC1234567",
+    "amount": 500000
+  }}
+}}</pre></div>
+
+                <h4>Response:</h4>
+                <div class="code-block"><pre>{{
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {{
+    "success": true,
+    "status": "confirmed",
+    "message": "Cash payment confirmed",
+    "data": {{
+      "transaction_id": "{prefix}ABC1234567",
+      "amount": 500000,
+      "confirmed_at": "2026-04-04 10:32:00"
+    }}
+  }}
+}}</pre></div>
+            </div>
+
+            <!-- API 3: Get Transaction -->
+            <div class="api-section">
+                <h3>3. Get Transaction</h3>
+                <p><span class="api-method api-method-get">GET</span><span class="api-url">{base_url}/transaction/&#123;transaction_id&#125;</span></p>
+                <p class="api-description">Read the current status of one transaction.</p>
+            </div>
+
+            <!-- API 4: List Transactions -->
+            <div class="api-section">
+                <h3>4. List Transactions</h3>
+                <p><span class="api-method api-method-get">GET</span><span class="api-url">{base_url}/transactions</span></p>
+                <p class="api-description">List transactions of this payment method.</p>
+            </div>
+
+            <div class="api-section">
+                <h3>Error Codes</h3>
+                <ul>
+                    <li><code>METHOD_NOT_FOUND</code>: Payment method not found or inactive</li>
+                    <li><code>CORS_BLOCKED</code>: Origin not allowed</li>
+                    <li><code>INVALID_AMOUNT</code>: Amount validation failed</li>
+                    <li><code>AMOUNT_MISMATCH</code>: Confirm amount differs from the transaction amount</li>
                     <li><code>TRANSACTION_NOT_FOUND</code>: Transaction doesn't exist</li>
                     <li><code>TRANSACTION_EXPIRED</code>: Transaction expired (&gt;1 hour)</li>
                     <li><code>INTERNAL_ERROR</code>: Server error</li>

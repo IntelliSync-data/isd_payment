@@ -30,6 +30,13 @@ class IsdPaymentTransaction(models.Model):
         index=True
     )
 
+    payment_provider = fields.Selection(
+        related='payment_method_id.payment_provider',
+        string='Provider',
+        store=True,
+        index=True,
+    )
+
     active = fields.Boolean(string='Active', default=True)
     user_id = fields.Many2one(
         'res.users', string='Assigned User',
@@ -172,6 +179,14 @@ class IsdPaymentTransaction(models.Model):
     vnpay_pay_date = fields.Char(
         string='VNPay Pay Date',
         help='Raw payment timestamp from VNPay (yyyyMMddHHmmss)'
+    )
+
+    # Cash Info
+    cash_collected_by = fields.Many2one(
+        'res.users',
+        string='Cash Collected By',
+        readonly=True,
+        help='User who confirmed the cash payment in Odoo'
     )
 
     # Reconciliation
@@ -634,6 +649,29 @@ class IsdPaymentTransaction(models.Model):
             'target': 'new',
             'views': [(self.env.ref('isd_payment.view_isd_payment_transaction_recon_popup').id, 'form')],
         }
+
+    def mark_as_confirmed_cash(self, collected_by=None):
+        """Mark transaction as confirmed (Cash collected by hand)"""
+        self.ensure_one()
+        vals = {
+            'status': 'confirmed',
+            'confirmed_at': fields.Datetime.now(),
+        }
+        if collected_by:
+            vals['cash_collected_by'] = collected_by.id
+        self.write(vals)
+
+    def action_confirm_cash(self):
+        """Confirm a cash payment from Odoo (staff received the money)"""
+        for record in self:
+            if record.payment_method_id.payment_provider != 'cash':
+                raise UserError(_('This action is only available for Cash transactions.'))
+            if record.status == 'confirmed':
+                raise UserError(_('Transaction is already confirmed.'))
+            if record.status in ('cancelled', 'expired'):
+                raise UserError(_('Cannot confirm a %s transaction.') % record.status)
+            record.mark_as_confirmed_cash(collected_by=self.env.user)
+        return True
 
     def mark_as_failed(self):
         """Mark transaction as failed"""

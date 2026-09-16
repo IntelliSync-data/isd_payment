@@ -1231,6 +1231,33 @@ class IsdPaymentController(http.Controller):
                     }
                 }
 
+            elif payment_method.payment_provider == 'cash':
+                # Cash: nothing to call, the money is collected by hand
+                transaction_id = request.env['isd_payment.transaction'].sudo().generate_transaction_id(
+                    payment_method.prefix
+                )
+
+                transaction = request.env['isd_payment.transaction'].sudo().create({
+                    'payment_method_id': payment_method.id,
+                    'transaction_id': transaction_id,
+                    'amount': amount,
+                    'description': description,
+                    'branch': branch,
+                    'status': 'pending',
+                    'request_origin': request_origin,
+                    'request_ip': request_ip,
+                })
+
+                return {
+                    'success': True,
+                    'data': {
+                        'transaction_id': transaction_id,
+                        'amount': amount,
+                        'status': 'pending',
+                        'created_at': transaction.create_date.strftime('%Y-%m-%d %H:%M:%S') if transaction.create_date else None,
+                    }
+                }
+
             else:
                 # SePay: generate QR code
                 transaction_id = request.env['isd_payment.transaction'].sudo().generate_transaction_id(
@@ -1409,6 +1436,28 @@ class IsdPaymentController(http.Controller):
                         'status': 'pending',
                         'message': 'Waiting for payment confirmation from VNPay',
                     }
+
+            if payment_method.payment_provider == 'cash':
+                # Cash: the caller states the money was received, confirm right away
+                if int(amount) != int(transaction.amount):
+                    return {
+                        'success': False,
+                        'status': transaction.status,
+                        'error': 'Amount does not match the transaction amount',
+                        'error_code': 'AMOUNT_MISMATCH'
+                    }
+
+                transaction.mark_as_confirmed_cash()
+                return {
+                    'success': True,
+                    'status': 'confirmed',
+                    'message': 'Cash payment confirmed',
+                    'data': {
+                        'transaction_id': transaction.transaction_id,
+                        'amount': transaction.amount,
+                        'confirmed_at': transaction.confirmed_at.strftime('%Y-%m-%d %H:%M:%S') if transaction.confirmed_at else None,
+                    }
+                }
 
             # Non-ACB providers: mark as processing and poll
             if transaction.status != 'processing':

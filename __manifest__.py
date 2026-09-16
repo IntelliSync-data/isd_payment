@@ -3,7 +3,7 @@
     'name': 'Payment (by ISD)',
     'version': '18.0.1.0.0',
     'category': 'ISD Modules',
-    'summary': 'Payment Gateway Integration (SePay, PayPal, VTC Pay, ACB Pay) with Auto-Generated REST APIs',
+    'summary': 'Payment Gateway Integration (SePay, PayPal, VTC Pay, ACB Pay, VNPay, Cash) with Auto-Generated REST APIs',
     'description': """
 ISD Payment Module
 ==================
@@ -26,6 +26,10 @@ Supported Payment Providers:
 ----------------------------
 * SePay (Vietnam - QR bank transfer)
 * PayPal (International - OAuth2 redirect flow)
+* VTC Pay (Vietnam - hosted checkout)
+* ACB Pay (Vietnam - QR code + webhook)
+* VNPay (Vietnam - hosted checkout)
+* Cash (paid by hand, no credentials needed)
 
 Use Cases:
 ----------

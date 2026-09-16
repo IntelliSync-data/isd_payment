@@ -43,7 +43,8 @@ class IsdPaymentMethod(models.Model):
 
     # Provider
     payment_provider = fields.Selection(
-        [('sepay', 'SePay'), ('paypal', 'PayPal'), ('vtcpay', 'VTC Pay'), ('acbpay', 'ACB Pay'), ('vnpay', 'VNPay')],
+        [('sepay', 'SePay'), ('paypal', 'PayPal'), ('vtcpay', 'VTC Pay'), ('acbpay', 'ACB Pay'),
+         ('vnpay', 'VNPay'), ('cash', 'Cash')],
         string='Payment Provider',
         required=True,
         default='sepay',
@@ -58,8 +59,7 @@ class IsdPaymentMethod(models.Model):
     )
     provider_host = fields.Char(
         string='Provider Host',
-        required=True,
-        help='API host URL for the payment provider'
+        help='API host URL for the payment provider. Not used by Cash.'
     )
     provider_account_id = fields.Char(
         string='Account ID',
@@ -223,7 +223,7 @@ class IsdPaymentMethod(models.Model):
             else:
                 record.api_base_url = False
 
-    @api.depends('payment_provider', 'provider_host', 'provider_account_id', 'provider_secret',
+    @api.depends('payment_provider', 'prefix', 'provider_host', 'provider_account_id', 'provider_secret',
                  'sepay_qr_host', 'sepay_acc_bank',
                  'vtc_security_code', 'vtc_receiver_account',
                  'acb_owner_number', 'acb_provider_id', 'acb_virtual_account_prefix', 'acb_beneficiary_name',
@@ -262,6 +262,9 @@ class IsdPaymentMethod(models.Model):
                     record.provider_account_id,
                     record.provider_secret,
                 ])
+            elif record.payment_provider == 'cash':
+                # Cash is collected by hand: no host, no client id, no secret
+                record.is_configured = bool(record.prefix)
             else:  # sepay
                 record.is_configured = all([
                     record.provider_host,

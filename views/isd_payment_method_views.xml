@@ -57,12 +57,23 @@
 
                     <notebook>
                         <page string="Provider Configuration" name="provider_config">
-                            <!-- Shared fields -->
-                            <group>
+                            <!-- Shared fields (every provider except Cash) -->
+                            <group invisible="payment_provider == 'cash'">
                                 <group string="Connection">
-                                    <field name="provider_host" placeholder="https://my.sepay.vn | https://api-m.sandbox.paypal.com | https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"/>
+                                    <field name="provider_host" required="payment_provider != 'cash'" placeholder="https://my.sepay.vn | https://api-m.sandbox.paypal.com | https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"/>
                                     <field name="provider_account_id" placeholder="SePay: account number | PayPal: Client ID | VNPay: TMN Code"/>
                                     <field name="provider_secret" password="True" placeholder="SePay: API token | PayPal: Client Secret | VNPay: Hash Secret"/>
+                                </group>
+                            </group>
+
+                            <!-- Cash-specific fields -->
+                            <group invisible="payment_provider != 'cash'">
+                                <group string="Cash Settings">
+                                    <div class="alert alert-info mb-0" role="alert" colspan="2">
+                                        <p class="mb-1"><b>Cash needs no credentials.</b> There is no host, no Client ID and no Secret to fill in.</p>
+                                        <p class="mb-0">A transaction stays <b>Pending</b> until the money is received, then it is confirmed
+                                            either with the <b>Mark as Paid</b> button on the transaction, or by calling the <b>/confirm</b> API.</p>
+                                    </div>
                                 </group>
                             </group>
 
@@ -210,6 +221,8 @@
                 <filter string="PayPal" name="paypal" domain="[('payment_provider','=','paypal')]"/>
                 <filter string="VTC Pay" name="vtcpay" domain="[('payment_provider','=','vtcpay')]"/>
                 <filter string="ACB Pay" name="acbpay" domain="[('payment_provider','=','acbpay')]"/>
+                <filter string="VNPay" name="vnpay" domain="[('payment_provider','=','vnpay')]"/>
+                <filter string="Cash" name="cash" domain="[('payment_provider','=','cash')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Provider" name="group_provider" context="{'group_by':'payment_provider'}"/>
                     <filter string="Company" name="group_company" context="{'group_by':'company_id'}" groups="base.group_multi_company"/>
