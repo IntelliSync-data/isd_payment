@@ -1,32 +1,81 @@
-name: Update Ehub Demo
+  name: Update ISD Payment Ehub
 
-on:
-  push:
-    branches:
-      - ehub-demo
+  on:
+    push:
+      branches:
+        - ehub
 
-jobs:
-  update:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+  jobs:
+    update:
+      runs-on: ubuntu-latest
       
-    - name: Update Ehub Demo
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.EHUB_DEMO_HOST }}
-        username: ${{ secrets.EHUB_DEMO_USERNAME }}
-        key: ${{ secrets.EHUB_DEMO_SSH_KEY }}
-        script_stop: true
-        script: |
-          # Force update to latest remote code (no conflicts)
-          cd ~/addons-system/openeducat
-          git fetch origin && git reset --hard origin/ehub-demo
-          
-          # Sync openeducat directory with rsync (including deletions)
-          rsync -av --delete ~/addons-system/openeducat/ ~/ehub-demo/
-          
-          # Restart Odoo service to apply changes
-          sudo systemctl restart odoo
+      steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Deploy isd_payment to Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EHUB_HOST }}
+          username: ${{ secrets.EHUB_USERNAME }}
+          key: ${{ secrets.EHUB_SSH_KEY }}
+          script_stop: true
+          script: |
+            # Clone if not exists, otherwise update
+            if [ ! -d /opt/addons-system/isd_payment ]; then
+              sudo mkdir -p /opt/addons-system
+              sudo chown odoo:odoo /opt/addons-system
+              sudo -u odoo git clone git@github-odoo:IntelliSync-data/isd_payment.git /opt/addons-system/isd_payment
+              cd /opt/addons-system/isd_payment && git checkout ehub
+            else
+              # ubuntu only have permission to run git commands, so we need to use sudo -u odoo to run git commands as odoo user
+              sudo -u odoo bash -c "cd /opt/addons-system/isd_payment && git fetch origin && git reset --hard origin/ehub" 
+            fi
+
+            # Sync isd_payment directory with rsync (including deletions)
+            sudo mkdir -p /opt/custom-addons/isd_payment
+            sudo rsync -av --delete \
+              --exclude='views/menu_items_override.xml.*' \
+              --exclude='__manifest__.py.*' \
+              /opt/addons-system/isd_payment/ /opt/custom-addons/isd_payment/
+
+      - name: Update isd_payment Module
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EHUB_HOST }}
+          username: ${{ secrets.EHUB_USERNAME }}
+          key: ${{ secrets.EHUB_SSH_KEY }}
+          script: |
+            echo "Updating apps list..."
+            echo "env['ir.module.module'].update_list(); env.cr.commit()" | sudo -u odoo /opt/odoo-venv/bin/python /opt/odoo18/odoo-bin shell -c /etc/odoo/odoo.conf -d ${{ secrets.EHUB_DB_NAME }} --no-http
+            echo "Updating isd_payment module..."
+            sudo -u odoo /opt/odoo-venv/bin/python /opt/odoo18/odoo-bin -c /etc/odoo/odoo.conf -d ${{ secrets.EHUB_DB_NAME }} -u isd_payment --stop-after-init --no-http || \
+              echo "Module not installed yet (now visible in Apps list), continuing..."
+
+      - name: Restart Odoo Service
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EHUB_HOST }}
+          username: ${{ secrets.EHUB_USERNAME }}
+          key: ${{ secrets.EHUB_SSH_KEY }}
+          script: |
+            sudo systemctl restart odoo
+
+      - name: Verify Odoo Service
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EHUB_HOST }}
+          username: ${{ secrets.EHUB_USERNAME }}
+          key: ${{ secrets.EHUB_SSH_KEY }}
+          script: |
+            sleep 5
+            if sudo systemctl is-active --quiet odoo; then
+              echo "Odoo restarted successfully"
+            else
+              echo "Odoo failed to restart"
+              echo "=== systemctl status ==="
+              sudo systemctl status odoo --no-pager
+              echo "=== Last 50 lines of Odoo log ==="
+              sudo tail -n 50 /var/log/odoo/odoo.log
+              exit 1
+            fi
