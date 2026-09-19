@@ -1,4 +1,4 @@
-name: Update ISD Service Management BloomPod
+name: Update ISD Payment BloomPod
 
 on:
   push:
