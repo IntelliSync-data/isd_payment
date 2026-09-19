@@ -18,6 +18,10 @@ class IsdPaymentMethod(models.Model):
         required=True,
         help='Display name of the payment method'
     )
+    description = fields.Text(
+        string='Description',
+        help='Short text shown under the payment method name, also returned by the APIs'
+    )
     image = fields.Image(
         string='Image',
         max_width=512,

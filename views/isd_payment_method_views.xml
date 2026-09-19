@@ -44,6 +44,7 @@
                     <group>
                         <group>
                             <field name="name" placeholder="e.g., Desktop App Payment"/>
+                            <field name="description" placeholder="Short note shown to customers"/>
                             <field name="active" widget="boolean_toggle"/>
                             <field name="payment_provider" widget="radio"/>
                             <field name="prefix" placeholder="e.g., DESK_"/>
