@@ -22,6 +22,14 @@ class IsdPaymentMethod(models.Model):
         string='Description',
         help='Short text shown under the payment method name, also returned by the APIs'
     )
+    environment = fields.Selection(
+        [('test', 'Test'), ('live', 'Live')],
+        string='Environment',
+        default='test',
+        required=True,
+        help='Whether this method points at the provider test API or the live one. '
+             'Informational only: it does not change how payments are created.'
+    )
     image = fields.Image(
         string='Image',
         max_width=512,

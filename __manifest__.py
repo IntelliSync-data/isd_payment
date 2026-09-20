@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Payment (by ISD)',
-    'version': '18.0.1.0.0',
+    'version': '18.0.1.1.0',
     'category': 'ISD Modules',
     'summary': 'Payment Gateway Integration (SePay, PayPal, VTC Pay, ACB Pay, VNPay, Cash) with Auto-Generated REST APIs',
     'description': """

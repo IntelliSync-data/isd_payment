@@ -38,6 +38,8 @@
                         </button>
                     </div>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <widget name="web_ribbon" title="Test" bg_color="text-bg-warning"
+                            invisible="not active or environment != 'test'"/>
                     <field name="is_configured" invisible="1"/>
                     <field name="image" widget="image" class="oe_avatar" options="{'preview_image': 'image'}"/>
 
@@ -45,6 +47,7 @@
                         <group>
                             <field name="name" placeholder="e.g., Desktop App Payment"/>
                             <field name="description" placeholder="Short note shown to customers"/>
+                            <field name="environment" widget="radio" options="{'horizontal': true}"/>
                             <field name="active" widget="boolean_toggle"/>
                             <field name="payment_provider" widget="radio"/>
                             <field name="prefix" placeholder="e.g., DESK_"/>
@@ -190,6 +193,9 @@
                 <field name="image" widget="image" options="{'size': [32, 32]}" string=" "/>
                 <field name="name"/>
                 <field name="payment_provider"/>
+                <field name="environment" widget="badge"
+                       decoration-success="environment == 'live'"
+                       decoration-warning="environment == 'test'"/>
                 <field name="prefix"/>
                 <field name="transaction_count"/>
                 <field name="pending_transaction_count"/>
@@ -218,6 +224,9 @@
                 <filter string="Configured" name="configured" domain="[('is_configured','=',True)]"/>
                 <filter string="Not Configured" name="not_configured" domain="[('is_configured','=',False)]"/>
                 <separator/>
+                <filter string="Live" name="live" domain="[('environment','=','live')]"/>
+                <filter string="Test" name="test" domain="[('environment','=','test')]"/>
+                <separator/>
                 <filter string="SePay" name="sepay" domain="[('payment_provider','=','sepay')]"/>
                 <filter string="PayPal" name="paypal" domain="[('payment_provider','=','paypal')]"/>
                 <filter string="VTC Pay" name="vtcpay" domain="[('payment_provider','=','vtcpay')]"/>
@@ -226,6 +235,7 @@
                 <filter string="Cash" name="cash" domain="[('payment_provider','=','cash')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Provider" name="group_provider" context="{'group_by':'payment_provider'}"/>
+                    <filter string="Environment" name="group_environment" context="{'group_by':'environment'}"/>
                     <filter string="Company" name="group_company" context="{'group_by':'company_id'}" groups="base.group_multi_company"/>
                 </group>
             </search>
