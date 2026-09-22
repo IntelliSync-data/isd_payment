@@ -673,6 +673,41 @@ class IsdPaymentTransaction(models.Model):
             record.mark_as_confirmed_cash(collected_by=self.env.user)
         return True
 
+    def mark_as_cancelled(self, reason=None):
+        """Cancel a transaction that is not expected to be paid any more.
+
+        Only ACB hands out a QR on the provider side that we can revoke. For the
+        other providers the old QR or link stays payable, so a webhook may still
+        confirm this transaction later — that is logged in write().
+        """
+        for record in self:
+            if record.status == 'confirmed':
+                raise UserError(_('Cannot cancel a confirmed transaction.'))
+            if record.status == 'cancelled':
+                continue
+
+            if record.payment_provider == 'acbpay' and record.acb_trace_number:
+                # Swallows its own errors and returns a result wizard action
+                record._do_cancel_acb_qr()
+
+            if record.status != 'cancelled':
+                record.write({'status': 'cancelled'})
+
+            _logger.info(
+                "Transaction %s cancelled%s",
+                record.transaction_id, (": %s" % reason) if reason else "")
+        return True
+
+    def write(self, vals):
+        if vals.get('status') == 'confirmed':
+            for record in self:
+                if record.status == 'cancelled':
+                    _logger.warning(
+                        "Transaction %s was paid after being cancelled "
+                        "(an old QR code or payment link was used)",
+                        record.transaction_id)
+        return super().write(vals)
+
     def mark_as_failed(self):
         """Mark transaction as failed"""
         self.ensure_one()
