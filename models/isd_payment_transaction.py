@@ -755,6 +755,29 @@ class IsdPaymentTransaction(models.Model):
         _logger.info("[%s] confirmed transaction %s", tag, transaction.transaction_id)
         return True
 
+    def mark_as_confirmed_manually(self, confirmed_by=None, reason=None):
+        """Confirm a transaction a human verified outside the gateway.
+
+        Used when staff can see the money arrived but the gateway never told us.
+        The provider fields stay empty on purpose: nothing came back from it.
+        """
+        for record in self:
+            if record.status == 'confirmed':
+                continue
+            vals = {
+                'status': 'confirmed',
+                'confirmed_at': fields.Datetime.now(),
+            }
+            if confirmed_by and record.payment_provider == 'cash':
+                vals['cash_collected_by'] = confirmed_by.id
+            record.write(vals)
+            _logger.info(
+                "Transaction %s confirmed manually by %s%s",
+                record.transaction_id,
+                confirmed_by.name if confirmed_by else 'system',
+                (": %s" % reason) if reason else '')
+        return True
+
     def mark_as_cancelled(self, reason=None):
         """Cancel a transaction that is not expected to be paid any more.
 
