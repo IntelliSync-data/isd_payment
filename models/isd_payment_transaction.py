@@ -673,6 +673,55 @@ class IsdPaymentTransaction(models.Model):
             record.mark_as_confirmed_cash(collected_by=self.env.user)
         return True
 
+    @api.model
+    def sepay_confirm_from_payload(self, payment_method, payload, tag='SePay'):
+        """Match one SePay transfer to a transaction of ours and confirm it.
+
+        `payload` uses the webhook field names; the pull API returns different ones,
+        so its caller normalises first. Returns True when something was confirmed.
+        """
+        if (payload.get('transferType') or 'in').lower() != 'in':
+            _logger.info("[%s] skipping outgoing transfer id=%s", tag, payload.get('id'))
+            return False
+
+        # Our transaction id travels in the QR `des`, so it lands in the content.
+        # `code` holds it directly when SePay is set to extract a payment code.
+        haystack = ' '.join(str(payload.get(k) or '') for k in
+                            ('code', 'content', 'description', 'referenceCode'))
+        candidates = re.findall(r'[A-Za-z0-9]{6,}', haystack)
+        if not candidates:
+            _logger.warning("[%s] no code found in content: %s", tag, haystack[:200])
+            return False
+
+        transaction = self.sudo().search([
+            ('payment_method_id', '=', payment_method.id),
+            ('transaction_id', 'in', candidates),
+        ], limit=1)
+
+        if not transaction:
+            _logger.warning("[%s] transaction not found, codes=%s", tag, candidates[:10])
+            return False
+
+        if transaction.status == 'confirmed':
+            _logger.info("[%s] %s already confirmed, skipping", tag, transaction.transaction_id)
+            return False
+
+        # Underpaying must not confirm an order; paying more is the customer's problem
+        transfer_amount = float(payload.get('transferAmount') or 0)
+        if transfer_amount + 1 < transaction.amount:
+            _logger.warning(
+                "[%s] %s received %s but expected %s, leaving it pending",
+                tag, transaction.transaction_id, transfer_amount, transaction.amount)
+            return False
+
+        transaction.mark_as_confirmed({
+            'id': payload.get('id'),
+            'reference_number': payload.get('referenceCode'),
+            'transaction_content': payload.get('content'),
+        })
+        _logger.info("[%s] confirmed transaction %s", tag, transaction.transaction_id)
+        return True
+
     def mark_as_cancelled(self, reason=None):
         """Cancel a transaction that is not expected to be paid any more.
 

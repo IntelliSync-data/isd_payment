@@ -100,6 +100,30 @@ class ApiDocumentationWizard(models.TransientModel):
                 wizard.api_documentation = self._generate_cash_docs(method, base_url)
                 continue
 
+            webhook_base = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+            sepay_webhook_html = ''
+            if method.payment_provider == 'sepay':
+                sepay_webhook_html = f"""
+                <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                    <h4>SePay Webhooks</h4>
+                    <p>Without them a payment is confirmed only while the customer keeps the
+                    waiting page open. Configure both URLs in the SePay dashboard:</p>
+                    <ul>
+                        <li>Realtime: <code>{webhook_base}/sepay/webhook/realtime</code></li>
+                        <li>Daily / replay: <code>{webhook_base}/sepay/webhook/daily</code></li>
+                    </ul>
+                    <p>SePay authenticates with the header
+                    <code>Authorization: Apikey &lt;key&gt;</code>. Generate the key on the payment
+                    method form and paste it into SePay.</p>
+                    <p>A transfer is matched by looking for the transaction id inside
+                    <code>code</code>, <code>content</code>, <code>description</code> or
+                    <code>referenceCode</code>, and is confirmed only when the amount received is at
+                    least the amount expected. Every call is stored in Webhook Logs.</p>
+                    <p>If a webhook never arrives, press <b>Pull Transactions</b> on the payment
+                    method to read the recent transfers from SePay and confirm what is still pending.</p>
+                </div>
+                """
+
             html = f'''
             <div class="api-documentation">
                 <style>
@@ -158,6 +182,8 @@ class ApiDocumentationWizard(models.TransientModel):
                     <p><b>Provider:</b> {wizard.provider_name}</p>
                     <p><b>CORS:</b> {'Enabled' if method.enable_cors else 'Disabled (Public API)'}</p>
                 </div>
+
+                {sepay_webhook_html}
 
                 <!-- API 1: Create Payment -->
                 <div class="api-section">

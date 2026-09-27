@@ -2,8 +2,13 @@
 
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
+from datetime import timedelta
+import logging
 import re
+import requests
 import secrets
+
+_logger = logging.getLogger(__name__)
 
 
 class IsdPaymentMethod(models.Model):
@@ -91,6 +96,21 @@ class IsdPaymentMethod(models.Model):
     sepay_acc_bank = fields.Char(
         string='Bank Code',
         help='Bank code (e.g., VCB, TCB, MB, ...)'
+    )
+    sepay_api_key = fields.Char(
+        string='Webhook API Key',
+        help='SePay sends it as the "Authorization: Apikey <key>" header. '
+             'Paste the same value into the SePay dashboard'
+    )
+    sepay_webhook_ip = fields.Char(
+        string='Webhook IP Whitelist',
+        help='Comma-separated IPs allowed to call the webhook. '
+             'Leave empty to accept any IP'
+    )
+    sepay_api_token = fields.Char(
+        string='User API Token',
+        help='Token from my.sepay.vn (Company > API Access). Only used by the '
+             'Pull Transactions button, which reconciles payments a webhook missed'
     )
     # VTC Pay-specific Configuration
     vtc_security_code = fields.Char(
@@ -351,6 +371,87 @@ class IsdPaymentMethod(models.Model):
             'params': {
                 'message': _('API Key generated successfully!'),
                 'type': 'success',
+                'sticky': False,
+            },
+        }
+
+    def action_generate_sepay_api_key(self):
+        self.ensure_one()
+        self.sepay_api_key = secrets.token_urlsafe(32)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'message': _('API Key generated successfully! Paste it into the SePay dashboard.'),
+                'type': 'success',
+                'sticky': False,
+            },
+        }
+
+    def action_sepay_pull_transactions(self, days=3):
+        """Ask SePay for the recent transfers and confirm the ones we missed.
+
+        Deliberately manual: the webhook is the normal path, this is the lifeboat
+        for when SePay could not reach us.
+        """
+        self.ensure_one()
+        if self.payment_provider != 'sepay':
+            raise ValidationError(_('This action is only available for SePay methods.'))
+        if not self.sepay_api_token:
+            raise ValidationError(_(
+                'Set the SePay User API Token first (my.sepay.vn > Company > API Access).'))
+
+        date_min = (fields.Datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
+        url = '%s/userapi/transactions/list' % (
+            (self.provider_host or 'https://my.sepay.vn').rstrip('/'))
+        params = {'limit': 500, 'transaction_date_min': date_min}
+        if self.provider_account_id:
+            params['account_number'] = self.provider_account_id
+
+        try:
+            response = requests.get(
+                url,
+                headers={'Authorization': 'Bearer %s' % self.sepay_api_token},
+                params=params,
+                timeout=30,
+            )
+            response.raise_for_status()
+            body = response.json()
+        except requests.RequestException as e:
+            raise ValidationError(_('Could not reach SePay: %s') % e)
+        except ValueError:
+            raise ValidationError(_('SePay returned a response that is not JSON.'))
+
+        if str(body.get('status', 200)) not in ('200', 'None'):
+            raise ValidationError(_('SePay error: %s') % (body.get('error') or body))
+
+        rows = body.get('transactions') or []
+        Transaction = self.env['isd_payment.transaction'].sudo()
+        confirmed = 0
+        for row in rows:
+            # The pull API names its fields differently from the webhook payload
+            payload = {
+                'id': row.get('id'),
+                'transferType': 'in' if float(row.get('amount_in') or 0) > 0 else 'out',
+                'transferAmount': row.get('amount_in') or 0,
+                'content': row.get('transaction_content'),
+                'referenceCode': row.get('reference_number'),
+                'code': row.get('code'),
+                'description': row.get('transaction_content'),
+            }
+            if Transaction.sepay_confirm_from_payload(self, payload, 'SePay Pull'):
+                confirmed += 1
+
+        _logger.info("[SePay Pull] %s rows from SePay, confirmed %s", len(rows), confirmed)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('SePay reconciliation'),
+                'message': _('Read %(total)s transfers from the last %(days)s days, '
+                             'confirmed %(confirmed)s payment(s).') % {
+                    'total': len(rows), 'days': days, 'confirmed': confirmed},
+                'type': 'success' if confirmed else 'warning',
                 'sticky': False,
             },
         }

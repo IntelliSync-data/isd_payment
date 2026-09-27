@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from odoo import http, _
+from odoo import http, fields, _
 from odoo.http import request, Response
 import json
 import logging
@@ -923,6 +923,132 @@ class IsdPaymentController(http.Controller):
                 content_type='application/json',
                 status=200,
             )
+
+    # ------------------------------------------------------------------
+    # SePay webhooks
+    # ------------------------------------------------------------------
+
+    def _sepay_response(self, success, message='', status=200):
+        body = {'success': success}
+        if message:
+            body['message'] = message
+        return Response(json.dumps(body), content_type='application/json', status=status)
+
+    def _sepay_authenticate(self, tag):
+        """Find the SePay method whose key matches the Authorization header.
+
+        SePay sends `Authorization: Apikey <key>`; the raw key is accepted too so
+        a manual curl does not need the prefix.
+
+        Returns (payment_method, error_response); exactly one of them is filled.
+        """
+        raw = (request.httprequest.headers.get('Authorization', '')
+               or request.httprequest.headers.get('x-api-key', '')).strip()
+        api_key = re.sub(r'^(apikey|bearer)\s+', '', raw, flags=re.IGNORECASE).strip()
+        request_ip = request.httprequest.remote_addr
+
+        if not api_key:
+            _logger.warning("[%s] missing Authorization header from %s", tag, request_ip)
+            return None, self._sepay_response(False, 'Missing API key', status=401)
+
+        payment_method = request.env['isd_payment.method'].sudo().search([
+            ('payment_provider', '=', 'sepay'),
+            ('sepay_api_key', '=', api_key),
+            ('active', '=', True),
+        ], limit=1)
+
+        if not payment_method:
+            _logger.warning("[%s] invalid API key from %s", tag, request_ip)
+            return None, self._sepay_response(False, 'Invalid API key', status=401)
+
+        allowed_ips = [ip.strip() for ip in (payment_method.sepay_webhook_ip or '').split(',') if ip.strip()]
+        if allowed_ips and request_ip not in allowed_ips:
+            _logger.warning("[%s] blocked IP %s, allowed: %s", tag, request_ip, allowed_ips)
+            return None, self._sepay_response(False, 'IP not allowed', status=403)
+
+        return payment_method, None
+
+    def _sepay_extract_transactions(self, data):
+        """SePay posts one transaction per call, but the daily endpoint also takes
+        a list or a {"transactions": [...]} envelope."""
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            for key in ('transactions', 'data'):
+                if isinstance(data.get(key), list):
+                    return data[key]
+            return [data]
+        return []
+
+    def _sepay_handle(self, tag, request_code):
+        """Shared body of the realtime and daily webhooks"""
+        payment_method, error = self._sepay_authenticate(tag)
+        if error:
+            return error
+
+        raw_body = request.httprequest.get_data(as_text=True)
+        _logger.info("[%s] raw body: %s", tag, raw_body)
+
+        log = request.env['isd_payment.webhook_log'].sudo().create({
+            'payment_method_id': payment_method.id,
+            'request_code': request_code,
+            'raw_body': raw_body,
+            'status': 'processing',
+            'request_ip': request.httprequest.remote_addr,
+        })
+
+        try:
+            data = json.loads(raw_body) if raw_body else {}
+        except ValueError:
+            log.write({'status': 'error', 'error_message': 'Body is not valid JSON'})
+            return self._sepay_response(False, 'Invalid JSON', status=400)
+
+        transactions = self._sepay_extract_transactions(data)
+        log.write({
+            'request_trace': str((transactions[0] or {}).get('id', '')) if transactions else '',
+            'transaction_count': len(transactions),
+        })
+
+        Transaction = request.env['isd_payment.transaction'].sudo()
+        confirmed = 0
+        for tx in transactions:
+            if isinstance(tx, dict) and Transaction.sepay_confirm_from_payload(
+                    payment_method, tx, tag):
+                confirmed += 1
+
+        log.write({
+            'status': 'done',
+            'processed_count': confirmed,
+            'processed_at': fields.Datetime.now(),
+        })
+        _logger.info("[%s] processed %s transactions, confirmed %s",
+                     tag, len(transactions), confirmed)
+
+        # Always 200 once authenticated, otherwise SePay keeps retrying a transfer
+        # we simply do not own
+        return self._sepay_response(True)
+
+    @http.route('/sepay/webhook/realtime', type='http', auth='public', methods=['POST'], csrf=False)
+    def sepay_webhook_realtime(self, **kwargs):
+        """Receive a transfer notification from SePay as it happens.
+
+        This is what confirms a payment when the customer closed the waiting page.
+        """
+        try:
+            return self._sepay_handle('SePay Realtime', 'SEPAY_REALTIME')
+        except Exception as e:
+            _logger.exception("[SePay Realtime] unhandled error")
+            return self._sepay_response(False, str(e), status=500)
+
+    @http.route('/sepay/webhook/daily', type='http', auth='public', methods=['POST'], csrf=False)
+    def sepay_webhook_daily(self, **kwargs):
+        """Reconciliation endpoint: same payload, but takes a batch of transfers
+        so anything the realtime hook missed can be replayed."""
+        try:
+            return self._sepay_handle('SePay Daily', 'SEPAY_DAILY')
+        except Exception as e:
+            _logger.exception("[SePay Daily] unhandled error")
+            return self._sepay_response(False, str(e), status=500)
 
     @http.route('/isd_payment/vnpay/ipn', type='http', auth='public', methods=['GET'], csrf=False)
     def vnpay_ipn(self, **kwargs):
