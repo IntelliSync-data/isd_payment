@@ -891,11 +891,6 @@ msgid "Webhook API Key"
 msgstr "API Key webhook"
 
 #. module: isd_payment
-#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__sepay_api_token
-msgid "User API Token"
-msgstr "User API Token"
-
-#. module: isd_payment
 #: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
 msgid "SePay Webhook"
 msgstr "Webhook SePay"
@@ -919,8 +914,8 @@ msgstr "Chức năng này chỉ dùng cho phương thức SePay."
 #. module: isd_payment
 #: code:addons/isd_payment/models/isd_payment_method.py:0
 #, python-format
-msgid "Set the SePay User API Token first (my.sepay.vn > Company > API Access)."
-msgstr "Hãy nhập User API Token của SePay trước (my.sepay.vn > Công ty > API Access)."
+msgid "Set the SePay Secret / Token first (my.sepay.vn > Company > API Access)."
+msgstr "Hãy nhập Secret / Token của SePay trước (my.sepay.vn > Công ty > API Access)."
 
 #. module: isd_payment
 #: code:addons/isd_payment/models/isd_payment_method.py:0

@@ -107,11 +107,6 @@ class IsdPaymentMethod(models.Model):
         help='Comma-separated IPs allowed to call the webhook. '
              'Leave empty to accept any IP'
     )
-    sepay_api_token = fields.Char(
-        string='User API Token',
-        help='Token from my.sepay.vn (Company > API Access). Only used by the '
-             'Pull Transactions button, which reconciles payments a webhook missed'
-    )
     # VTC Pay-specific Configuration
     vtc_security_code = fields.Char(
         string='Security Code',
@@ -397,9 +392,9 @@ class IsdPaymentMethod(models.Model):
         self.ensure_one()
         if self.payment_provider != 'sepay':
             raise ValidationError(_('This action is only available for SePay methods.'))
-        if not self.sepay_api_token:
+        if not self.provider_secret:
             raise ValidationError(_(
-                'Set the SePay User API Token first (my.sepay.vn > Company > API Access).'))
+                'Set the SePay Secret / Token first (my.sepay.vn > Company > API Access).'))
 
         date_min = (fields.Datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
         url = '%s/userapi/transactions/list' % (
@@ -411,7 +406,7 @@ class IsdPaymentMethod(models.Model):
         try:
             response = requests.get(
                 url,
-                headers={'Authorization': 'Bearer %s' % self.sepay_api_token},
+                headers={'Authorization': 'Bearer %s' % self.provider_secret},
                 params=params,
                 timeout=30,
             )

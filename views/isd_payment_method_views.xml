@@ -105,13 +105,11 @@
                                     <div colspan="2" class="text-muted mb-2">
                                         Lifeboat for when a webhook never arrived: reads the recent
                                         transfers straight from SePay and confirms the ones still pending.
-                                        Runs only when you press it.
+                                        Runs only when you press it, and uses the Secret / Token above.
                                     </div>
-                                    <field name="sepay_api_token" password="True"
-                                           placeholder="my.sepay.vn &gt; Company &gt; API Access"/>
                                     <button name="action_sepay_pull_transactions" type="object"
                                             string="Pull Transactions" class="btn-primary btn-sm"
-                                            icon="fa-download" invisible="not sepay_api_token"/>
+                                            icon="fa-download" invisible="not provider_secret"/>
                                 </group>
                             </group>
 
