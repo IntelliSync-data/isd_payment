@@ -383,6 +383,34 @@ class IsdPaymentMethod(models.Model):
             },
         }
 
+    def _sepay_log_pull(self, url, params, raw_text, status, total, confirmed, error=None):
+        """Keep what SePay answered in Webhook Logs, so a pull can be read back
+        from Odoo instead of digging through the server log file"""
+        self.ensure_one()
+        vals = {
+            'payment_method_id': self.id,
+            'request_code': 'SEPAY_PULL',
+            'request_trace': '%s?%s' % (url, '&'.join('%s=%s' % kv for kv in params.items())),
+            'raw_body': raw_text or '',
+            'transaction_count': total,
+            'processed_count': confirmed,
+            'status': status,
+            'error_message': error,
+            'processed_at': fields.Datetime.now(),
+        }
+
+        if status != 'error':
+            self.env['isd_payment.webhook_log'].sudo().create(vals)
+            return
+
+        # The caller raises right after, which would roll this record back, so the
+        # failure is written on a cursor of its own
+        try:
+            with self.env.registry.cursor() as cr:
+                self.env(cr=cr)['isd_payment.webhook_log'].sudo().create(vals)
+        except Exception:
+            _logger.exception("[SePay Pull] could not store the failed pull in Webhook Logs")
+
     def action_sepay_pull_transactions(self, days=3):
         """Ask SePay for the recent transfers and confirm the ones we missed.
 
@@ -403,6 +431,9 @@ class IsdPaymentMethod(models.Model):
         if self.provider_account_id:
             params['account_number'] = self.provider_account_id
 
+        _logger.info("[SePay Pull] GET %s params=%s", url, params)
+
+        raw_text = ''
         try:
             response = requests.get(
                 url,
@@ -410,14 +441,23 @@ class IsdPaymentMethod(models.Model):
                 params=params,
                 timeout=30,
             )
+            raw_text = response.text
+            _logger.info("[SePay Pull] HTTP %s, body: %s", response.status_code, raw_text[:4000])
             response.raise_for_status()
             body = response.json()
         except requests.RequestException as e:
+            _logger.exception("[SePay Pull] request failed, body: %s", raw_text[:2000])
+            self._sepay_log_pull(url, params, raw_text or str(e), 'error', 0, 0, str(e))
             raise ValidationError(_('Could not reach SePay: %s') % e)
         except ValueError:
+            _logger.error("[SePay Pull] response is not JSON: %s", raw_text[:2000])
+            self._sepay_log_pull(url, params, raw_text, 'error', 0, 0, 'Response is not JSON')
             raise ValidationError(_('SePay returned a response that is not JSON.'))
 
         if str(body.get('status', 200)) not in ('200', 'None'):
+            _logger.error("[SePay Pull] SePay refused: %s", raw_text[:2000])
+            self._sepay_log_pull(url, params, raw_text, 'error', 0, 0,
+                                 str(body.get('error') or body)[:500])
             raise ValidationError(_('SePay error: %s') % (body.get('error') or body))
 
         rows = body.get('transactions') or []
@@ -438,6 +478,8 @@ class IsdPaymentMethod(models.Model):
                 confirmed += 1
 
         _logger.info("[SePay Pull] %s rows from SePay, confirmed %s", len(rows), confirmed)
+        self._sepay_log_pull(url, params, raw_text, 'done', len(rows), confirmed)
+
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
