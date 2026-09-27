@@ -2,7 +2,8 @@
 
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError, UserError
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, time
+import pytz
 import string
 import random
 import json
@@ -241,9 +242,42 @@ class IsdPaymentTransaction(models.Model):
         help='Whether transaction has expired'
     )
 
+    # create_date is stored in UTC, which makes a plain domain on it select the
+    # wrong day for anyone east of Greenwich. This is the same date read in the
+    # user timezone, so the Today / Yesterday filters mean what they say.
+    create_date_local = fields.Date(
+        string='Created On', compute='_compute_create_date_local',
+        search='_search_create_date_local')
+
     _sql_constraints = [
         ('transaction_id_unique', 'unique(transaction_id)', 'Transaction ID must be unique!'),
     ]
+
+    @api.depends('create_date')
+    def _compute_create_date_local(self):
+        for record in self:
+            record.create_date_local = fields.Datetime.context_timestamp(
+                record, record.create_date).date() if record.create_date else False
+
+    def _search_create_date_local(self, operator, value):
+        """Turn a local calendar day into the UTC window it really covers"""
+        tz = pytz.timezone(self.env.context.get('tz') or self.env.user.tz or 'UTC')
+
+        def boundary(day, end_of_day=False):
+            naive = datetime.combine(day, time.max if end_of_day else time.min)
+            return fields.Datetime.to_string(
+                tz.localize(naive).astimezone(pytz.utc).replace(tzinfo=None))
+
+        day = fields.Date.to_date(value)
+        if operator == '=':
+            return [('create_date', '>=', boundary(day)),
+                    ('create_date', '<=', boundary(day, end_of_day=True))]
+        if operator in ('>=', '>'):
+            return [('create_date', operator, boundary(day, end_of_day=(operator == '>')))]
+        if operator in ('<=', '<'):
+            return [('create_date', operator, boundary(day, end_of_day=(operator == '<=')))]
+        raise ValidationError(
+            _("Operator %s is not supported on the creation date filter.") % operator)
 
     @api.depends('create_date')
     def _compute_expired_at(self):

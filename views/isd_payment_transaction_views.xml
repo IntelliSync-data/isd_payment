@@ -165,10 +165,12 @@
                 <filter string="Failed" name="status_failed" domain="[('status','=','failed')]"/>
                 <filter string="Expired" name="status_expired" domain="[('status','=','expired')]"/>
                 <separator/>
-                <filter string="Today" name="today" domain="[('create_date','&gt;=',context_today())]"/>
-                <filter string="Yesterday" name="yesterday" domain="[('create_date','&gt;=', context_today() - relativedelta(days=1)), ('create_date','&lt;',context_today())]"/>
-                <filter string="This Week" name="this_week" domain="[('create_date','&gt;=', (context_today() - relativedelta(weeks=1)))]"/>
-                <filter string="This Month" name="this_month" domain="[('create_date','&gt;=', (context_today() - relativedelta(months=1)))]"/>
+                <!-- create_date_local reads the date in the user timezone, so these
+                     mean the calendar day the user is actually living in -->
+                <filter string="Today" name="today" domain="[('create_date_local','=',context_today())]"/>
+                <filter string="Yesterday" name="yesterday" domain="[('create_date_local','=', context_today() - relativedelta(days=1))]"/>
+                <filter string="This Week" name="this_week" domain="[('create_date_local','&gt;=', context_today() - relativedelta(days=context_today().weekday()))]"/>
+                <filter string="This Month" name="this_month" domain="[('create_date_local','&gt;=', context_today().strftime('%Y-%m-01'))]"/>
                 <separator/>
                 <filter string="Has SePay Response" name="has_sepay_response" domain="[('sepay_transaction_id','!=',False)]"/>
                 <separator/>

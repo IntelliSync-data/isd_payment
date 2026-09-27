@@ -928,3 +928,8 @@ msgstr "Không kết nối được tới SePay: %s"
 #, python-format
 msgid "SePay reconciliation"
 msgstr "Đối soát SePay"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__create_date_local
+msgid "Created On"
+msgstr "Ngày tạo"
