@@ -762,6 +762,16 @@ class IsdPaymentController(http.Controller):
                         _logger.info(f"[ACB API2 Realtime] matched by referenceNumber={reference_number}")
 
                 if not transaction:
+                    # Last resort: the code with its punctuation stripped, found
+                    # anywhere in what the bank sent
+                    transaction = request.env['isd_payment.transaction'].sudo().find_by_reference([
+                        reference_number, virtual_account,
+                        tx.get('transactionContent'),
+                    ])
+                    if transaction:
+                        _logger.info(f"[ACB API2 Realtime] matched loosely as {transaction.transaction_id}")
+
+                if not transaction:
                     _logger.warning(f"[ACB API2 Realtime] transaction not found (traceNumber={trace_number}, virtualAccount={virtual_account}, referenceNumber={reference_number})")
                     continue
 

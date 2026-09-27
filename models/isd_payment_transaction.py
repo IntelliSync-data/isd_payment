@@ -674,6 +674,42 @@ class IsdPaymentTransaction(models.Model):
         return True
 
     @api.model
+    def _normalize_code(self, value):
+        """Banks drop punctuation from a transfer content, so TEST_ABC123 comes
+        back as TESTABC123. Comparing both sides stripped and upper-cased is the
+        only way a prefix with a separator can ever match."""
+        return re.sub(r'[^A-Za-z0-9]', '', value or '').upper()
+
+    @api.model
+    def find_by_reference(self, texts, payment_method=None, days=30):
+        """Find the transaction a bank reference points at.
+
+        The code is looked for anywhere inside the normalised text, because banks
+        also glue it to their own references (MOMO123TESTABC123MOMO).
+        """
+        haystack = self._normalize_code(' '.join(str(t or '') for t in texts))
+        if len(haystack) < 6:
+            return self.browse()
+
+        # A code of five characters or less would match half the table by accident
+        query = """
+            SELECT id
+              FROM isd_payment_transaction
+             WHERE create_date > (now() AT TIME ZONE 'UTC') - make_interval(days => %s)
+               AND length(regexp_replace(upper(transaction_id), '[^A-Z0-9]', '', 'g')) >= 6
+               AND position(regexp_replace(upper(transaction_id), '[^A-Z0-9]', '', 'g') in %s) > 0
+        """
+        params = [days, haystack]
+        if payment_method:
+            query += " AND payment_method_id = %s"
+            params.append(payment_method.id)
+        query += " ORDER BY create_date DESC LIMIT 1"
+
+        self.env.cr.execute(query, params)
+        row = self.env.cr.fetchone()
+        return self.browse(row[0]) if row else self.browse()
+
+    @api.model
     def sepay_confirm_from_payload(self, payment_method, payload, tag='SePay'):
         """Match one SePay transfer to a transaction of ours and confirm it.
 
@@ -686,21 +722,18 @@ class IsdPaymentTransaction(models.Model):
 
         # Our transaction id travels in the QR `des`, so it lands in the content.
         # `code` holds it directly when SePay is set to extract a payment code.
-        haystack = ' '.join(str(payload.get(k) or '') for k in
-                            ('code', 'content', 'description', 'referenceCode'))
-        candidates = re.findall(r'[A-Za-z0-9]{6,}', haystack)
-        if not candidates:
-            _logger.warning("[%s] no code found in content: %s", tag, haystack[:200])
-            return False
-
-        transaction = self.sudo().search([
-            ('payment_method_id', '=', payment_method.id),
-            ('transaction_id', 'in', candidates),
-        ], limit=1)
+        texts = [payload.get(k) for k in ('code', 'content', 'description', 'referenceCode')]
+        transaction = self.sudo().find_by_reference(texts)
 
         if not transaction:
-            _logger.warning("[%s] transaction not found, codes=%s", tag, candidates[:10])
+            _logger.warning("[%s] transaction not found in: %s", tag,
+                            self._normalize_code(' '.join(str(t or '') for t in texts))[:200])
             return False
+
+        if transaction.payment_method_id != payment_method:
+            # One SePay account can serve several methods, so this is worth seeing
+            _logger.info("[%s] %s belongs to method %s, not the one that authenticated",
+                         tag, transaction.transaction_id, transaction.payment_method_id.name)
 
         if transaction.status == 'confirmed':
             _logger.info("[%s] %s already confirmed, skipping", tag, transaction.transaction_id)
