@@ -169,7 +169,7 @@
                      mean the calendar day the user is actually living in -->
                 <filter string="Today" name="today" domain="[('create_date_local','=',context_today())]"/>
                 <filter string="Yesterday" name="yesterday" domain="[('create_date_local','=', context_today() - relativedelta(days=1))]"/>
-                <filter string="This Week" name="this_week" domain="[('create_date_local','&gt;=', context_today() - relativedelta(days=context_today().weekday()))]"/>
+                <filter string="This Week" name="this_week" domain="[('create_date_local','&gt;=', context_today() - relativedelta(days=6) + relativedelta(weekday=0))]"/>
                 <filter string="This Month" name="this_month" domain="[('create_date_local','&gt;=', context_today().strftime('%Y-%m-01'))]"/>
                 <separator/>
                 <filter string="Has SePay Response" name="has_sepay_response" domain="[('sepay_transaction_id','!=',False)]"/>
