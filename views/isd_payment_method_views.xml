@@ -86,6 +86,16 @@
                                 <group string="SePay Settings">
                                     <field name="sepay_qr_host" placeholder="https://qr.sepay.vn"/>
                                     <field name="sepay_acc_bank" placeholder="VCB"/>
+                                    <label for="sepay_qr_pay" string="SePay Type"/>
+                                    <div>
+                                        <field name="sepay_qr_pay"/>
+                                        <label for="sepay_qr_pay" string="QR Pay" class="ms-1 me-3"/>
+                                        <field name="sepay_bank_transfer"/>
+                                        <label for="sepay_bank_transfer" string="Bank Transfer" class="ms-1"/>
+                                    </div>
+                                    <field name="sepay_bank_account"
+                                           placeholder="Leave empty to use the Account ID above"/>
+                                    <field name="sepay_bank_name" placeholder="Ngan hang ACB"/>
                                 </group>
                                 <group string="SePay Webhook">
                                     <div colspan="2" class="text-muted mb-2">

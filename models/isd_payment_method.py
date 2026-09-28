@@ -97,6 +97,24 @@ class IsdPaymentMethod(models.Model):
         string='Bank Code',
         help='Bank code (e.g., VCB, TCB, MB, ...)'
     )
+    # SePay confirms on the transfer content alone, so the same method can be
+    # paid by scanning a QR or by typing the transfer by hand. Two booleans
+    # rather than a selection because both can be offered at once.
+    sepay_qr_pay = fields.Boolean(
+        string='QR Pay', default=True,
+        help='Offer the QR code the customer scans with a banking app')
+    sepay_bank_transfer = fields.Boolean(
+        string='Bank Transfer',
+        help='Offer the account details the customer transfers to by hand')
+    sepay_bank_account = fields.Char(
+        string='Bank Account',
+        help='Account number shown to a customer paying by transfer. '
+             'Defaults to the Account ID above when left empty')
+    sepay_bank_name = fields.Char(
+        string='Bank Name',
+        help='Bank name as a customer reads it, e.g. "Ngan hang ACB". '
+             'The Bank Code above is the technical code the QR API needs')
+
     sepay_api_key = fields.Char(
         string='Webhook API Key',
         help='SePay sends it as the "Authorization: Apikey <key>" header. '
@@ -368,6 +386,29 @@ class IsdPaymentMethod(models.Model):
                 'type': 'success',
                 'sticky': False,
             },
+        }
+
+    def get_transfer_info(self):
+        """What a customer needs in order to pay, beyond the QR image.
+
+        Returned by the APIs so a checkout page can show the account details
+        next to the QR code. Empty for providers that have none.
+        """
+        self.ensure_one()
+        if self.payment_provider != 'sepay':
+            return {}
+
+        types = []
+        if self.sepay_qr_pay:
+            types.append('qr_pay')
+        if self.sepay_bank_transfer:
+            types.append('bank_transfer')
+
+        return {
+            'types': types,
+            'bank_account': self.sepay_bank_account or self.provider_account_id or '',
+            'bank_name': self.sepay_bank_name or '',
+            'bank_code': self.sepay_acc_bank or '',
         }
 
     def action_generate_sepay_api_key(self):

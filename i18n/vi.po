@@ -336,6 +336,8 @@ msgstr "URL mã QR"
 
 #. module: isd_payment
 #: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__bank_account
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__sepay_bank_account
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
 msgid "Bank Account"
 msgstr "Tài khoản ngân hàng"
 
@@ -933,3 +935,26 @@ msgstr "Đối soát SePay"
 #: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__create_date_local
 msgid "Created On"
 msgstr "Ngày tạo"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__sepay_qr_pay
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "QR Pay"
+msgstr "Quét mã QR"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__sepay_bank_transfer
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "Bank Transfer"
+msgstr "Chuyển khoản"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__sepay_bank_name
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "Bank Name"
+msgstr "Tên ngân hàng"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "SePay Type"
+msgstr "Loại SePay"
