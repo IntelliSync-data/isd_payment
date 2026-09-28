@@ -96,7 +96,7 @@
                                     </div>
                                     <field name="sepay_api_key" password="True"
                                            placeholder="Authorization: Apikey ..."/>
-                                    <button name="action_generate_sepay_api_key" type="object"
+                                    <button name="action_generate_sepay_api_key" type="object" groups="isd_payment.group_isd_payment_manager"
                                             string="Generate API Key" class="btn-secondary btn-sm"
                                             icon="fa-refresh" confirm="This will replace the current API Key. Continue?"/>
                                     <field name="sepay_webhook_ip" placeholder="Leave empty to accept any IP"/>
@@ -107,7 +107,7 @@
                                         transfers straight from SePay and confirms the ones still pending.
                                         Runs only when you press it, and uses the Secret / Token above.
                                     </div>
-                                    <button name="action_sepay_pull_transactions" type="object"
+                                    <button name="action_sepay_pull_transactions" type="object" groups="isd_payment.group_isd_payment_manager"
                                             string="Pull Transactions" class="btn-primary btn-sm"
                                             icon="fa-download" invisible="not provider_secret"/>
                                 </group>
@@ -157,7 +157,7 @@
                                 </group>
                                 <group string="ACB Pay Security">
                                     <field name="acb_api_key" password="True" placeholder="x-api-key for webhook verification"/>
-                                    <button name="action_generate_acb_api_key" type="object"
+                                    <button name="action_generate_acb_api_key" type="object" groups="isd_payment.group_isd_payment_manager"
                                             string="Generate API Key" class="btn-secondary btn-sm"
                                             icon="fa-refresh" confirm="This will replace the current API Key. Continue?"/>
                                     <field name="acb_webhook_ip" placeholder="124.197.28.244"/>

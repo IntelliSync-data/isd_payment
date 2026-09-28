@@ -10,7 +10,8 @@
                 <header>
                     <button name="action_confirm_cash" type="object" string="Mark as Paid" class="btn-primary"
                             invisible="payment_provider != 'cash' or status in ('confirmed', 'cancelled', 'expired')"
-                            confirm="Confirm that the cash has been received?"/>
+                            confirm="Confirm that the cash has been received?"
+                            groups="isd_payment.group_isd_payment_manager"/>
                     <field name="payment_provider" invisible="1"/>
                     <field name="status" widget="statusbar" statusbar_visible="pending,processing,confirmed"/>
                 </header>
@@ -137,11 +138,11 @@
                 <field name="reconciliation_status" widget="badge" decoration-success="reconciliation_status == 'matched'" decoration-info="reconciliation_status == 'waiting'" decoration-warning="reconciliation_status in ('updated', 'bank_data')" decoration-danger="reconciliation_status == 'review'"/>
                 <button name="action_confirm_cash" type="object" icon="fa-money" string="" class="btn-link"
                         invisible="payment_provider != 'cash' or status in ('confirmed', 'cancelled', 'expired')"
-                        title="Mark as Paid"/>
+                        title="Mark as Paid" groups="isd_payment.group_isd_payment_manager"/>
                 <field name="payment_provider" column_invisible="True"/>
                 <button name="action_view_reconciliation_data" type="object" icon="fa-cog" string="" invisible="reconciliation_status == 'waiting'" class="btn-link"/>
-                <button name="action_query_acb_status" type="object" icon="fa-bell" string="" invisible="not acb_trace_number" class="btn-link" title="Query ACB Status"/>
-                <button name="action_cancel_acb_qr" type="object" icon="fa-times-circle" string="" invisible="not acb_trace_number or status in ('confirmed', 'cancelled', 'expired')" class="btn-link text-danger" title="Cancel QR Code"/>
+                <button name="action_query_acb_status" type="object" icon="fa-bell" string="" invisible="not acb_trace_number" class="btn-link" title="Query ACB Status" groups="isd_payment.group_isd_payment_manager"/>
+                <button name="action_cancel_acb_qr" type="object" icon="fa-times-circle" string="" invisible="not acb_trace_number or status in ('confirmed', 'cancelled', 'expired')" class="btn-link text-danger" title="Cancel QR Code" groups="isd_payment.group_isd_payment_manager"/>
                 <field name="acb_trace_number" column_invisible="True"/>
                 <field name="currency_id" column_invisible="True"/>
             </list>
