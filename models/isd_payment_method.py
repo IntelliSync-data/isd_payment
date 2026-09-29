@@ -18,13 +18,15 @@ class IsdPaymentMethod(models.Model):
     _rec_name = 'name'
 
     # Basic Info
+    # Both reach the customer through the APIs, so both carry one wording per
+    # language, written with the selector next to the field
     name = fields.Char(
         string='Payment Method Name',
-        required=True,
+        required=True, translate=True,
         help='Display name of the payment method'
     )
     description = fields.Text(
-        string='Description',
+        string='Description', translate=True,
         help='Short text shown under the payment method name, also returned by the APIs'
     )
     environment = fields.Selection(
@@ -220,12 +222,13 @@ class IsdPaymentMethod(models.Model):
 
     # Shown to the customer on the checkout page, by whoever renders it
     notice_title = fields.Char(
-        string='Notice Title',
+        string='Notice Title', translate=True,
         help='Short heading a checkout page shows for this method, '
-             'e.g. "Pay at the counter"'
+             'e.g. "Pay at the counter". Write one per language with the '
+             'selector next to the field'
     )
     notice_description = fields.Text(
-        string='Notice Description',
+        string='Notice Description', translate=True,
         help='What the customer has to do or expect, e.g. "Hand the money to '
              'our staff. Your order is confirmed once they receive it."'
     )

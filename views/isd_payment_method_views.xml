@@ -81,9 +81,9 @@
                                 </group>
                             </group>
 
-                            <!-- Wording the checkout page shows, useful for every
-                                 provider but written mostly for Cash -->
-                            <group>
+                            <!-- Wording the checkout page shows for Cash: there is no
+                                 gateway screen to explain how the money changes hands -->
+                            <group invisible="payment_provider != 'cash'">
                                 <group string="Notice to Customer">
                                     <field name="notice_title" placeholder="Pay at the counter"/>
                                     <field name="notice_description"
