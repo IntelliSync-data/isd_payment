@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 
-from odoo import models, fields, api, _
+from odoo import models, fields, api, SUPERUSER_ID, _
 from odoo.exceptions import ValidationError, UserError
 from datetime import timedelta, datetime, time
 import pytz
 import string
 import random
+import hashlib
+import hmac
 import json
 import logging
 import requests
@@ -837,15 +839,130 @@ class IsdPaymentTransaction(models.Model):
                 record.transaction_id, (": %s" % reason) if reason else "")
         return True
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+
+        # ACB daily reconciliation creates a transaction that is confirmed from
+        # birth, for money that arrived under a reference we never issued.
+        # write() never runs for it, so it would otherwise tell nobody.
+        born_confirmed = records.filtered(lambda r: r.status == 'confirmed')
+        if born_confirmed:
+            born_confirmed._on_confirmed()
+            for record in born_confirmed:
+                record._notify_webhook('transaction.confirmed')
+        return records
+
     def write(self, vals):
-        if vals.get('status') == 'confirmed':
+        new_status = vals.get('status')
+        changed = self.browse()
+        if new_status:
             for record in self:
-                if record.status == 'cancelled':
+                if record.status == new_status:
+                    continue
+                if new_status == 'confirmed' and record.status == 'cancelled':
                     _logger.warning(
                         "Transaction %s was paid after being cancelled "
                         "(an old QR code or payment link was used)",
                         record.transaction_id)
-        return super().write(vals)
+                changed |= record
+
+        res = super().write(vals)
+
+        if changed:
+            confirmed = changed.filtered(lambda r: r.status == 'confirmed')
+            if confirmed:
+                confirmed._on_confirmed()
+            # Every status change goes out, so a waiting page can also be told
+            # the QR expired or was cancelled, not only that it was paid
+            for record in changed:
+                record._notify_webhook('transaction.%s' % record.status)
+        return res
+
+    def _on_confirmed(self):
+        """A transaction just became confirmed, whichever path confirmed it.
+
+        The single place anything inside this Odoo that cares about a payment
+        landing can hook into: a gateway webhook, a poll, a manual confirmation,
+        all end up here.
+        """
+        return True
+
+    def _webhook_payload(self, event='transaction.confirmed'):
+        """What the outbound webhook sends. Other modules extend it."""
+        self.ensure_one()
+        return {
+            'event': event,
+            'transaction_id': self.transaction_id,
+            'status': self.status,
+            'amount': self.amount,
+            'branch': self.branch or '',
+            'confirmed_at': fields.Datetime.to_string(self.confirmed_at) or '',
+            'reference': self.sepay_reference or self.acb_trace_number or '',
+            'payment_method': {
+                'id': self.payment_method_id.id,
+                'name': self.payment_method_id.name or '',
+                'type': self.payment_method_id.payment_provider or '',
+            },
+        }
+
+    def _notify_webhook(self, event='transaction.confirmed'):
+        """Tell an outside system what happened to this transaction.
+
+        Sent after the commit, so a slow or unreachable endpoint can neither
+        roll back the confirmation nor hold up the gateway waiting on us.
+        """
+        self.ensure_one()
+        url = (self.payment_method_id.webhook_url or '').strip()
+        if not url:
+            return
+
+        payload = self._webhook_payload(event)
+        secret = self.payment_method_id.webhook_secret or ''
+        method_id = self.payment_method_id.id
+        transaction_id = self.transaction_id
+        registry = self.env.registry
+
+        def deliver():
+            body = json.dumps(payload, default=str)
+            headers = {
+                'Content-Type': 'application/json',
+                'X-ISD-Event': payload['event'],
+            }
+            if secret:
+                headers['X-ISD-Signature'] = hmac.new(
+                    secret.encode(), body.encode(), hashlib.sha256).hexdigest()
+
+            status, error = 'done', None
+            try:
+                response = requests.post(url, data=body, headers=headers, timeout=10)
+                _logger.info("[Webhook out] %s -> %s %s",
+                             transaction_id, url, response.status_code)
+                if response.status_code >= 300:
+                    status, error = 'error', 'HTTP %s: %s' % (
+                        response.status_code, response.text[:500])
+            except Exception as e:
+                _logger.exception("[Webhook out] %s -> %s failed", transaction_id, url)
+                status, error = 'error', str(e)
+
+            # Own cursor: the request that triggered this is already committed
+            try:
+                with registry.cursor() as cr:
+                    api.Environment(cr, SUPERUSER_ID, {})['isd_payment.webhook_log'].create({
+                        'payment_method_id': method_id,
+                        'request_code': 'OUTBOUND_%s' % payload['event'].split('.')[-1].upper(),
+                        'request_trace': url,
+                        'raw_body': body,
+                        'transaction_count': 1,
+                        'processed_count': 1 if status == 'done' else 0,
+                        'status': status,
+                        'error_message': error,
+                        'processed_at': fields.Datetime.now(),
+                    })
+            except Exception:
+                _logger.exception("[Webhook out] could not log the delivery")
+
+        self.env.cr.postcommit.add(deliver)
 
     def mark_as_failed(self):
         """Mark transaction as failed"""

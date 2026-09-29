@@ -958,3 +958,38 @@ msgstr "Tên ngân hàng"
 #: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
 msgid "SePay Type"
 msgstr "Loại SePay"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__webhook_url
+msgid "Notify URL"
+msgstr "URL thông báo"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__webhook_secret
+msgid "Notify Secret"
+msgstr "Mã bí mật thông báo"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "Notify on Payment"
+msgstr "Thông báo khi thanh toán"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "Generate Secret"
+msgstr "Tạo mã bí mật"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__notice_title
+msgid "Notice Title"
+msgstr "Tiêu đề hướng dẫn"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__notice_description
+msgid "Notice Description"
+msgstr "Nội dung hướng dẫn"
+
+#. module: isd_payment
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "Notice to Customer"
+msgstr "Hướng dẫn cho khách"

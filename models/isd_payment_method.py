@@ -218,6 +218,31 @@ class IsdPaymentMethod(models.Model):
         help='VND to USD exchange rate for converting payment amounts'
     )
 
+    # Shown to the customer on the checkout page, by whoever renders it
+    notice_title = fields.Char(
+        string='Notice Title',
+        help='Short heading a checkout page shows for this method, '
+             'e.g. "Pay at the counter"'
+    )
+    notice_description = fields.Text(
+        string='Notice Description',
+        help='What the customer has to do or expect, e.g. "Hand the money to '
+             'our staff. Your order is confirmed once they receive it."'
+    )
+
+    # Outbound notification, for a system outside this Odoo
+    webhook_url = fields.Char(
+        string='Notify URL',
+        help='Called with a POST when a transaction of this method is confirmed. '
+             'Leave empty to notify nobody. Only for systems outside this Odoo: '
+             'modules inside it are already told directly'
+    )
+    webhook_secret = fields.Char(
+        string='Notify Secret',
+        help='Signs the body with HMAC-SHA256 and sends it as the X-ISD-Signature '
+             'header, so the receiver can tell a real call from a forged one'
+    )
+
     # CORS Configuration
     enable_cors = fields.Boolean(
         string='Enable CORS',
@@ -388,6 +413,16 @@ class IsdPaymentMethod(models.Model):
             },
         }
 
+    def get_notice(self):
+        """Wording a checkout page shows for this method. Empty when unset."""
+        self.ensure_one()
+        if not self.notice_title and not self.notice_description:
+            return {}
+        return {
+            'title': self.notice_title or '',
+            'description': self.notice_description or '',
+        }
+
     def get_transfer_info(self):
         """What a customer needs in order to pay, beyond the QR image.
 
@@ -409,6 +444,19 @@ class IsdPaymentMethod(models.Model):
             'bank_account': self.sepay_bank_account or self.provider_account_id or '',
             'bank_name': self.sepay_bank_name or '',
             'bank_code': self.sepay_acc_bank or '',
+        }
+
+    def action_generate_webhook_secret(self):
+        self.ensure_one()
+        self.webhook_secret = secrets.token_urlsafe(32)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'message': _('Secret generated. Give it to whoever receives the calls.'),
+                'type': 'success',
+                'sticky': False,
+            },
         }
 
     def action_generate_sepay_api_key(self):

@@ -81,6 +81,16 @@
                                 </group>
                             </group>
 
+                            <!-- Wording the checkout page shows, useful for every
+                                 provider but written mostly for Cash -->
+                            <group>
+                                <group string="Notice to Customer">
+                                    <field name="notice_title" placeholder="Pay at the counter"/>
+                                    <field name="notice_description"
+                                           placeholder="Hand the money to our staff. Your order is confirmed once they receive it."/>
+                                </group>
+                            </group>
+
                             <!-- SePay-specific fields -->
                             <group invisible="payment_provider != 'sepay'">
                                 <group string="SePay Settings">
@@ -171,6 +181,30 @@
                                             string="Generate API Key" class="btn-secondary btn-sm"
                                             icon="fa-refresh" confirm="This will replace the current API Key. Continue?"/>
                                     <field name="acb_webhook_ip" placeholder="124.197.28.244"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Notify on Payment" name="outbound_webhook">
+                            <div class="text-muted mb-3">
+                                Calls a URL of yours with a POST as soon as a transaction of this
+                                method is confirmed, whether the gateway, a poll or a person
+                                confirmed it. Meant for a system <b>outside</b> this Odoo, such as
+                                your website: modules inside it already hear about it directly.
+                                The call is sent after the payment is saved, so a slow or dead
+                                endpoint can never lose a payment. Deliveries are stored in
+                                Webhook Logs as <code>OUTBOUND_CONFIRMED</code>.
+                            </div>
+                            <group>
+                                <group string="Endpoint">
+                                    <field name="webhook_url" placeholder="https://bloompod.vn/api/payment-confirmed"/>
+                                    <field name="webhook_secret" password="True"
+                                           invisible="not webhook_url"/>
+                                    <button name="action_generate_webhook_secret" type="object"
+                                            string="Generate Secret" class="btn-secondary btn-sm"
+                                            icon="fa-refresh" invisible="not webhook_url"
+                                            groups="isd_payment.group_isd_payment_manager"
+                                            confirm="This will replace the current Secret. Continue?"/>
                                 </group>
                             </group>
                         </page>
