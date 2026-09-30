@@ -61,14 +61,26 @@ class IsdPaymentTransaction(models.Model):
         string='Amount',
         required=True,
         digits=(16, 2),
-        help='Transaction amount in VND'
+        help='Amount really charged, in the currency of the payment method'
+    )
+    currency = fields.Selection(
+        related='payment_method_id.currency',
+        string='Charge Currency', store=True, readonly=True,
+        help='Currency the amount above is in'
     )
     currency_id = fields.Many2one(
         'res.currency',
         string='Currency',
-        default=lambda self: self.env.ref('base.VND'),
-        help='Currency (VND)'
+        compute='_compute_currency_id', store=True, readonly=True,
+        help='Same currency as a record, so monetary fields render correctly'
     )
+
+    @api.depends('currency')
+    def _compute_currency_id(self):
+        usd = self.env.ref('base.USD', raise_if_not_found=False)
+        vnd = self.env.ref('base.VND', raise_if_not_found=False)
+        for record in self:
+            record.currency_id = usd if record.currency == 'usd' else vnd
     description = fields.Char(
         string='Description',
         help='Optional description for this transaction'

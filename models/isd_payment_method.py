@@ -60,6 +60,16 @@ class IsdPaymentMethod(models.Model):
         required=True
     )
 
+    currency = fields.Selection(
+        [('vnd', 'VND'), ('usd', 'USD')],
+        string='Charge Currency',
+        default='vnd',
+        required=True,
+        help='What this gateway actually charges in. The caller converts the '
+             'order total into it before creating a transaction, so the amount '
+             'stored is always the amount really charged'
+    )
+
     # Provider
     payment_provider = fields.Selection(
         [('sepay', 'SePay'), ('paypal', 'PayPal'), ('vtcpay', 'VTC Pay'), ('acbpay', 'ACB Pay'),

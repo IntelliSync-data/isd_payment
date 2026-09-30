@@ -993,3 +993,19 @@ msgstr "Nội dung hướng dẫn"
 #: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
 msgid "Notice to Customer"
 msgstr "Hướng dẫn cho khách"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__currency
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transaction__currency
+msgid "Charge Currency"
+msgstr "Đơn vị thanh toán"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_method__currency__vnd
+msgid "VND"
+msgstr "VND"
+
+#. module: isd_payment
+#: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_method__currency__usd
+msgid "USD"
+msgstr "USD"

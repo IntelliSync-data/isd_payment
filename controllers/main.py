@@ -1165,7 +1165,8 @@ class IsdPaymentController(http.Controller):
     # ==========================================
 
     @http.route('/api/payment/<int:method_id>/create', type='json', auth='public', methods=['POST'], csrf=False)
-    def create_payment(self, method_id, amount=None, description='', branch='', **kwargs):
+    def create_payment(self, method_id, amount=None, description='', branch='',
+                       amount_currency=None, **kwargs):
         """
         Create payment and generate QR code
 
@@ -1211,6 +1212,18 @@ class IsdPaymentController(http.Controller):
                     'success': False,
                     'error': 'Amount exceeds maximum allowed (500,000,000 VND)',
                     'error_code': 'AMOUNT_TOO_LARGE'
+                }
+
+            # A caller that knows what it is sending says so, and the amount is
+            # charged as given. Without it the old assumption stands: the amount
+            # is in VND, and PayPal converts it itself.
+            charged_in_method_currency = bool(
+                amount_currency and amount_currency.lower() == payment_method.currency)
+            if amount_currency and amount_currency.lower() not in ('vnd', 'usd'):
+                return {
+                    'success': False,
+                    'error': 'amount_currency must be vnd or usd',
+                    'error_code': 'INVALID_CURRENCY'
                 }
 
             # Get request info
@@ -1293,7 +1306,8 @@ class IsdPaymentController(http.Controller):
 
             elif payment_method.payment_provider == 'paypal':
                 # PayPal: create order and return redirect URL
-                paypal_result = self._create_paypal_payment(payment_method, amount)
+                paypal_result = self._create_paypal_payment(
+                    payment_method, amount, already_converted=charged_in_method_currency)
                 if not paypal_result.get('found'):
                     return {
                         'success': False,

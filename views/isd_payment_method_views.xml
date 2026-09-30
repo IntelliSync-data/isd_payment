@@ -51,6 +51,7 @@
                             <field name="active" widget="boolean_toggle"/>
                             <field name="payment_provider" widget="radio"/>
                             <field name="prefix" placeholder="e.g., DESK_"/>
+                            <field name="currency" widget="radio" options="{'horizontal': true}"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
                         <group>

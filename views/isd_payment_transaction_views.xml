@@ -25,6 +25,7 @@
                         <group>
                             <field name="payment_method_id" readonly="1"/>
                             <field name="amount" widget="monetary" options="{'currency_field': 'currency_id'}" readonly="1"/>
+                            <field name="currency" readonly="1"/>
                             <field name="currency_id" invisible="1"/>
                             <field name="description" readonly="1"/>
                             <field name="branch" readonly="1"/>
@@ -129,7 +130,9 @@
                 <field name="payment_method_id"/>
                 <field name="user_id" widget="many2one_avatar_user" optional="show"/>
                 <field name="branch"/>
-                <field name="amount" sum="Total Amount"/>
+                <field name="currency" optional="hide"/>
+                <field name="amount" sum="Total Amount" widget="monetary"
+                       options="{'currency_field': 'currency_id'}"/>
                 <field name="status" widget="badge" decoration-success="status == 'confirmed'" decoration-info="status in ('pending', 'processing')" decoration-danger="status in ('failed', 'cancelled')" decoration-muted="status == 'expired'"/>
                 <field name="create_date" string="Created"/>
                 <field name="confirmed_at"/>
