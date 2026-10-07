@@ -826,6 +826,44 @@ class IsdPaymentTransaction(models.Model):
                 (": %s" % reason) if reason else '')
         return True
 
+    def change_amount(self, amount):
+        """Re-price a transaction nobody has paid yet.
+
+        Returns True once the transaction asks for `amount`, False when it
+        cannot be moved and the caller has to cancel it and open a new one.
+
+        Whether a re-price is possible belongs to the provider, not to the
+        caller. A SePay QR is a URL this Odoo builds, so it can be rebuilt
+        around the new amount and keep the same reference, which is what the
+        bank matches on. Everything else hands the customer something the
+        provider issued - an ACB QR against a trace number, a PayPal or VNPay
+        link signed with the amount - and none of those follow a number we
+        change here, so they say no rather than leave the customer holding a
+        code for the old price.
+        """
+        self.ensure_one()
+        if not amount or amount <= 0:
+            return False
+        if self.status not in ('pending', 'processing'):
+            return False
+
+        vals = {'amount': amount}
+        if self.currency == 'usd':
+            vals['amount_usd'] = amount
+
+        provider = self.payment_method_id.payment_provider
+        if provider == 'sepay' and self.qr_url:
+            vals['qr_url'] = self.payment_method_id.generate_qr_url(
+                self.transaction_id, amount)
+        elif self.qr_url or self.paypal_redirect_url or self.vnpay_redirect_url:
+            # Something was handed to the customer with the old amount in it
+            return False
+
+        self.sudo().write(vals)
+        _logger.info(
+            "Transaction %s re-priced to %s", self.transaction_id, amount)
+        return True
+
     def mark_as_cancelled(self, reason=None):
         """Cancel a transaction that is not expected to be paid any more.
 
