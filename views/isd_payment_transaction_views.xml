@@ -173,7 +173,11 @@
                      mean the calendar day the user is actually living in -->
                 <filter string="Today" name="today" domain="[('create_date_local','=',context_today())]"/>
                 <filter string="Yesterday" name="yesterday" domain="[('create_date_local','=', context_today() - relativedelta(days=1))]"/>
-                <filter string="This Week" name="this_week" domain="[('create_date_local','&gt;=', context_today() - relativedelta(days=6) + relativedelta(weekday=0))]"/>
+                <!-- Week runs Sunday to Saturday: step back 6 days, then forward to the
+                     nearest Sunday. weekday=6 is dateutil's SU(+1), which the browser's
+                     own evaluator implements the same way, so the filter means the same
+                     thing before and after it reaches the server. -->
+                <filter string="This Week" name="this_week" domain="[('create_date_local','&gt;=', context_today() - relativedelta(days=6) + relativedelta(weekday=6))]"/>
                 <filter string="This Month" name="this_month" domain="[('create_date_local','&gt;=', context_today().strftime('%Y-%m-01'))]"/>
                 <separator/>
                 <filter string="Has SePay Response" name="has_sepay_response" domain="[('sepay_transaction_id','!=',False)]"/>
