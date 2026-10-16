@@ -230,6 +230,26 @@ class IsdPaymentMethod(models.Model):
         help='VND to USD exchange rate for converting payment amounts'
     )
 
+    # Cash covers two unrelated ways of being paid outside a gateway: money
+    # handed over on delivery, and a transfer the customer makes by hand. They
+    # need different things on the checkout page, so the method says which.
+    cash_type = fields.Selection([
+        ('cod', 'Cash On Delivery'),
+        ('info_transfer', 'Info Transfer'),
+    ], string='Cash Type', default='cod',
+        help='Cash On Delivery collects the money in person. Info Transfer '
+             'shows the customer the account details to send it to')
+    transfer_line_ids = fields.One2many(
+        'isd_payment.transfer.line', 'method_id',
+        string='Transfer Details',
+        help='The lines a customer needs in order to make the transfer. Add '
+             'as many as the bank asks for')
+    transfer_note = fields.Text(
+        string='Transfer Note', translate=True,
+        help='Anything that is not a labelled line, e.g. how long a wire takes '
+             'or what to do after sending it'
+    )
+
     # Shown to the customer on the checkout page, by whoever renders it
     notice_title = fields.Char(
         string='Notice Title', translate=True,
@@ -443,6 +463,20 @@ class IsdPaymentMethod(models.Model):
         next to the QR code. Empty for providers that have none.
         """
         self.ensure_one()
+
+        if self.payment_provider == 'cash':
+            if self.cash_type != 'info_transfer':
+                # Money changes hands in person: there is nothing to copy
+                return {}
+            return {
+                'type': 'info_transfer',
+                'fields': [{
+                    'label': line.label or '',
+                    'value': line.value or '',
+                } for line in self.transfer_line_ids],
+                'note': self.transfer_note or '',
+            }
+
         if self.payment_provider != 'sepay':
             return {}
 
@@ -453,6 +487,9 @@ class IsdPaymentMethod(models.Model):
             types.append('bank_transfer')
 
         return {
+            # Named so a caller can branch on the shape instead of guessing it
+            # from which keys happen to be present
+            'type': 'sepay',
             'types': types,
             'bank_account': self.sepay_bank_account or self.provider_account_id or '',
             'bank_name': self.sepay_bank_name or '',

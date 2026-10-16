@@ -74,11 +74,30 @@
                             <!-- Cash-specific fields -->
                             <group invisible="payment_provider != 'cash'">
                                 <group string="Cash Settings">
+                                    <field name="cash_type" widget="radio"/>
                                     <div class="alert alert-info mb-0" role="alert" colspan="2">
                                         <p class="mb-1"><b>Cash needs no credentials.</b> There is no host, no Client ID and no Secret to fill in.</p>
                                         <p class="mb-0">A transaction stays <b>Pending</b> until the money is received, then it is confirmed
                                             either with the <b>Mark as Paid</b> button on the transaction, or by calling the <b>/confirm</b> API.</p>
                                     </div>
+                                </group>
+                            </group>
+
+                            <!-- Info Transfer: the customer sends the money themselves,
+                                 so the checkout page has to show them where to send it.
+                                 The lines are typed in rather than fixed, because what a
+                                 bank asks for differs by country. -->
+                            <group invisible="payment_provider != 'cash' or cash_type != 'info_transfer'">
+                                <group string="Transfer Details" colspan="2">
+                                    <field name="transfer_line_ids" nolabel="1" colspan="2">
+                                        <list editable="bottom">
+                                            <field name="sequence" widget="handle"/>
+                                            <field name="label" placeholder="SWIFT/BIC code"/>
+                                            <field name="value" placeholder="BFTVVNVX"/>
+                                        </list>
+                                    </field>
+                                    <field name="transfer_note" colspan="2"
+                                           placeholder="A wire usually takes 2-3 working days. Email us the receipt once you have sent it."/>
                                 </group>
                             </group>
 

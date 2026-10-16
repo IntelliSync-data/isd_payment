@@ -1009,3 +1009,44 @@ msgstr "VND"
 #: model:ir.model.fields.selection,name:isd_payment.selection__isd_payment_method__currency__usd
 msgid "USD"
 msgstr "USD"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__cash_type
+msgid "Cash Type"
+msgstr "Loại tiền mặt"
+
+#. module: isd_payment
+#: model:ir.model.fields,selection:isd_payment.field_isd_payment_method__cash_type
+msgid "Cash On Delivery"
+msgstr "Thu tiền khi giao"
+
+#. module: isd_payment
+#: model:ir.model.fields,selection:isd_payment.field_isd_payment_method__cash_type
+msgid "Info Transfer"
+msgstr "Thông tin chuyển khoản"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__transfer_line_ids
+#: model:ir.ui.view,arch_db:isd_payment.view_isd_payment_method_form
+msgid "Transfer Details"
+msgstr "Thông tin chuyển khoản"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_method__transfer_note
+msgid "Transfer Note"
+msgstr "Ghi chú chuyển khoản"
+
+#. module: isd_payment
+#: model:ir.model,name:isd_payment.model_isd_payment_transfer_line
+msgid "Payment Transfer Detail"
+msgstr "Dòng thông tin chuyển khoản"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transfer_line__label
+msgid "Label"
+msgstr "Nhãn"
+
+#. module: isd_payment
+#: model:ir.model.fields,field_description:isd_payment.field_isd_payment_transfer_line__value
+msgid "Value"
+msgstr "Giá trị"
